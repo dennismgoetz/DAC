@@ -10,7 +10,7 @@ library(corrplot)
 
 # Load and preprocess data
 setwd("C:/Users/Vincent Bl/Desktop/DAC/")
-ccdata <- read.csv("creditcard.csv")
+ccdata <- read.csv("creditcard.csv")[1:10000,]
 ccdata <- ccdata[,-1] %>% mutate_at(vars(-Class), scale)
 
 
@@ -37,12 +37,13 @@ T <- samples_X
 
 # Algorithm 1: Noise filtering
 dis_matrix <- proxy::dist(P, T)
-dis_df <- as.data.frame.matrix(dis_matrix)
+#dis_df <- as.data.frame.matrix(dis_matrix)
+
 
 Mu <- vector()  # Set of unqualified minority instances
 Mq <- vector()  # Set of qualified minority instances
 for (i in 1:nrow(P)) {
-  min_index <- apply(dis_df[i,], 1, function(x) order(x)[2])
+  min_index <- order(dis_matrix[i,])[2]
   if (train[min_index,]$Class == 0) {
     # unqualified minority instance
     Mu <- rbind(Mu, P[i, ])
@@ -62,9 +63,8 @@ k <- 5
 
 synthetic <- list()
 
-
 for(i in seq_len(nrow(Mq))) {
-  min_index <- order(dis_matrix[i,])[1:k]
+  min_index <- order(dis_matrix[i,])[2:(k+1)]
   best_index <- integer(0)
   best_f <- 1
   for(h in min_index) {
