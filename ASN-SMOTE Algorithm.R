@@ -8,9 +8,9 @@ library(tibble)
 library(corrplot)
 
 # Load the data
-setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master BAOR/05_Kurse/01_Business Analytics/04_Data Analytics Challenge/05_Scripts")
+setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 ccdata <- read.csv("creditcard.csv")
-#ccdata <- ccdata[1:50000,]
+ccdata <- ccdata[1:10000,]
 
 ### Preprocessing
 
@@ -21,19 +21,23 @@ ccdata[,-30] <- scale(ccdata[,-30])
 
 ### Split into training/test set
 set.seed(123)
-split <- sample.split(ccdata$Class, SplitRatio = 0.01)
+split <- sample.split(ccdata$Class, SplitRatio = 0.7)
 train <-  subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
-train
 table(train$Class)
 
-#Minority_X <- c(Minority_sample_X)
+#Mq <- c(Minority_sample_X)
 
 ###### ASN SMOTE  ##########
 
 ### Algorithm 1: Noise filtering step
 samples_X <- train[,1:29] #Features
 samples_Y <- train$Class #Target value
+#All_X <- as.matrix(samples_X)
+
+
+
+Majority_train <- train[train$Class == 0,]
 
 Minority_sample <- train[train$Class == 1,] #Minority set
 Minority_sample_X <- Minority_sample[,1:29] #Features of Minority set
@@ -44,46 +48,100 @@ T <- samples_X
 print(Minority_sample)
 print(nrow(Minority_sample))
 
-# Mu: set of unqualified minority instances
-# Mq: set of qualified minority instances
 
 
-############################ muss man bei nearest neighbor berechnung die class raus nehmen???
-# Step 1: Initialization
+### Algorithm 1
 Mu <- vector()  # Set of unqualified minority instances
 Mq <- vector()  # Set of qualified minority instances
-
-# Step 2: Iterate over each instance in the minority class
+dis_matrix <- matrix(0, nrow = nrow(P), ncol = nrow(T))
 for (i in 1:nrow(P)) {
   nearest_distance <- Inf
   nearest_p <- NULL
   
-  # Step 3: Calculate the Euclidean distance to each instance in T
+  #  Calculate the Euclidean distance to each instance in T
   for (j in 1:nrow(T)) {
-    if (all(P[i,] != T[j,])) {                                      #if (all(P[1,] == T[j,]) == FALSE) {
      distances <- sqrt(sum((P[i,] - T[j,])^2))
-    
-     # Step 4: Check if the nearest instance is in the minority class
+     dis_matrix[i, j] <- distances
+     if (all(P[i,] == T[j,])) {
+       dis_matrix[i, j] <- 99999
+     }
+     
+     # Check if the nearest instance is in the minority class
       if (distances < nearest_distance) {
         nearest_distance <- distances
         index <- j
       }
-    }
+    
   }
   
   if (train[index,]$Class == 0) {
-    # Step 5: Record the unqualified minority instance
+    # unqualified minority instance
     Mu <- rbind(Mu, P[i, ])
   } else {
-    # Step 6: Record the qualified minority instance
+    # qualified minority instance
     Mq <- rbind(Mq, P[i, ])
+  }
+}
+dim(dis_matrix)
+
+
+
+
+# Algorithm 2 + 3
+
+# Parameters for SMOTE
+n <- 10
+k <- 5
+
+synthetic <- list()
+
+
+for(i in seq_len(nrow(Mq))) {
+  min_index <- order(dis_matrix[i,])[1:k]
+  best_index <- integer(0)
+  best_f <- 1
+  for(h in min_index) {
+    if(samples_Y[h] == 0) {
+      best_index[best_f] <- h
+      best_f <- best_f + 1
+      break
+    } else {
+      best_index[best_f] <- h
+      best_f <- best_f + 1
+    }
+  }
+  
+
+# Create new synthetic minority samples
+  for(j in seq_len(n)) {
+    nn <- sample(seq_along(best_index), 1)
+    dif <- All_X[best_index[nn],] - Mq[i,]
+    gap <- runif(1)
+    synthetic_instance <- Mq[i, ] + gap * dif
+    synthetic[[length(synthetic) + 1]] <- synthetic_instance
   }
 }
 
 
-### Algorithm 2
+# Combine all data frames in the synthetic list into a single data frame
+synthetic_df <- do.call(rbind, synthetic)
+
+
+# Combine the synthetic instances and their labels
+synthetic_labels <- rep(1, length(synthetic))
+Mq_labels <- rep(1,nrow(Mq))
+synthetic_df$Class <- synthetic_labels
+
+# Combine qualified instances with synthetic instances
+Mq$Class <- Mq_labels
+syntheticMq <- rbind(Mq, synthetic_df)
+samples <- Majority_train
+
+
+# Combine majority with new minority
+examples <- rbind(samples, syntheticMq)
+table(examples$Class)
 
 
 
-### Algorithm 3
 
