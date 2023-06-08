@@ -65,7 +65,7 @@ synthetic <- list()
 
 for(i in seq_len(nrow(Mq))) {
   min_index <- order(dis_matrix[i,])[2:(k+1)]
-  best_index <- integer(0)
+  best_index <- vector()
   best_f <- 1
   for(h in min_index) {
     if(samples_Y[h] == 0) {
