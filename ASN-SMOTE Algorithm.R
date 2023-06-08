@@ -26,14 +26,13 @@ train <-  subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
 table(train$Class)
 
-#Mq <- c(Minority_sample_X)
 
 ###### ASN SMOTE  ##########
 
 ### Algorithm 1: Noise filtering step
 samples_X <- train[,1:29] #Features
 samples_Y <- train$Class #Target value
-#All_X <- as.matrix(samples_X)
+All_X <- as.matrix(samples_X)
 
 
 
@@ -54,24 +53,27 @@ print(nrow(Minority_sample))
 Mu <- vector()  # Set of unqualified minority instances
 Mq <- vector()  # Set of qualified minority instances
 dis_matrix <- matrix(0, nrow = nrow(P), ncol = nrow(T))
+
+
 for (i in 1:nrow(P)) {
   nearest_distance <- Inf
   nearest_p <- NULL
   
   #  Calculate the Euclidean distance to each instance in T
   for (j in 1:nrow(T)) {
+    if (all(P[i,] != T[j,])){
      distances <- sqrt(sum((P[i,] - T[j,])^2))
      dis_matrix[i, j] <- distances
+     
      if (all(P[i,] == T[j,])) {
        dis_matrix[i, j] <- 99999
      }
-     
      # Check if the nearest instance is in the minority class
       if (distances < nearest_distance) {
         nearest_distance <- distances
         index <- j
       }
-    
+    }
   }
   
   if (train[index,]$Class == 0) {
@@ -82,7 +84,6 @@ for (i in 1:nrow(P)) {
     Mq <- rbind(Mq, P[i, ])
   }
 }
-dim(dis_matrix)
 
 
 
