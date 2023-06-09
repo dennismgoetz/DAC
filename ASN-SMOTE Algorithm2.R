@@ -30,8 +30,7 @@ train_target <- train$Class #Target value of train
 
 
 
-<<<<<<< HEAD
- 
+
 asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority instance = 1
   
   train_feat_matrix <- as.matrix(train_feat)
@@ -41,7 +40,7 @@ asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority in
   ####### [1:29] muss man noch ändern sodass man Function für andere Datensätze replizieren kann
   train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
   
-   # Algorithm 1: Noise filtering
+  # Algorithm 1: Noise filtering
   dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
   #dis_df <- as.data.frame.matrix(dis_matrix)
   
@@ -53,40 +52,6 @@ asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority in
     if (data[min_index,]$Class == 0) {
       # unqualified minority instance
       Mu <- rbind(Mu, train_Minority_feat[i, ])
-=======
-Mu <- vector()  # Set of unqualified minority instances
-Mq <- vector()  # Set of qualified minority instances
-for (i in 1:nrow(P)) {
-  min_index <- order(dis_matrix[i,])[2]
-  if (train[min_index,]$Class == 0) {
-    # unqualified minority instance
-    Mu <- rbind(Mu, P[i, ])
-  } else {
-    # qualified minority instance
-    Mq <- rbind(Mq, P[i, ])
-  }
-}
-nrow(P)
-
-nrow(Mu)
-nrow(Mq)
-
-# Parameters for SMOTE
-n <- 10
-k <- 5
-
-synthetic <- list()
-
-for(i in seq_len(nrow(Mq))) {
-  min_index <- order(dis_matrix[i,])[2:(k+1)]
-  best_index <- vector()
-  best_f <- 1
-  for(h in min_index) {
-    if(samples_Y[h] == 0) {
-      best_index[best_f] <- h
-      best_f <- best_f + 1
-      break
->>>>>>> efbe5d498d68b48e8d1f1414df6c3c0d2b87e8ee
     } else {
       # qualified minority instance
       Mq <- rbind(Mq, train_Minority_feat[i, ])
