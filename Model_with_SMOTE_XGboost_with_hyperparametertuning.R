@@ -47,7 +47,7 @@ splitIntoKSubsets <- function(K = 5, dataset = ccdata){
 ## auswählen des x-ten Datensatzes als Testdatensatz, zusammenfassen der 
 ## restlichen als Trainingsdatensatz
 
-# Input: Index des Subsets welcher Trainingsdatensatz sein soll, Liste mit Subsets
+# Input: Index des Subsets welcher Testdatensatz sein soll, Liste mit Subsets
 mergeSubsetsIntoTrainAndTest <- function(whichSubsetAsTest = 1, subsetList = splitIntoKSubsets()){
   test <- subsetList[[whichSubsetAsTest]]
   train <- data.frame()
