@@ -29,27 +29,23 @@ train_target <- train$Class #Target value of train
 
 
 
-
-
-asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority instance = 1
+#asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority instance = 1
   
   train_feat_matrix <- as.matrix(train_feat)
-  train_Majority <- data[train_target == 0,]
-  train_Minority <- data[train_target == 1,]
+  train_Majority <- train[train_target == 0,]
+  train_Minority <- train[train_target == 1,]
   
   ####### [1:29] muss man noch ändern sodass man Function für andere Datensätze replizieren kann
   train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
   
   # Algorithm 1: Noise filtering
   dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
-  #dis_df <- as.data.frame.matrix(dis_matrix)
-  
-  
+
   Mu <- vector()  # Set of unqualified minority instances
   Mq <- vector()  # Set of qualified minority instances
   for (i in 1:nrow(train_Minority_feat)) {
     min_index <- order(dis_matrix[i,])[2]
-    if (data[min_index,]$Class == 0) {
+    if (train[min_index,]$Class == 0) {
       # unqualified minority instance
       Mu <- rbind(Mu, train_Minority_feat[i, ])
     } else {
@@ -57,18 +53,18 @@ asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority in
       Mq <- rbind(Mq, train_Minority_feat[i, ])
     }
   }
-  #nrow(train_Minority_feat)
+
   
-  #nrow(Mu)
-  #nrow(Mq)
-  
+  ### Algorithm 2 + 3
   synthetic <- list()
-  
+
+  Mq_dis_matrix <- dis_matrix[rownames(Mq), ]
+
   for(i in seq_len(nrow(Mq))) {
-    min_index <- order(dis_matrix[i,])[2:(k+1)]
+    nn_index <- order(Mq_dis_matrix[i,])[2:(k+1)]
     best_index <- vector()
     best_f <- 1
-    for(h in min_index) {
+    for(h in nn_index) {
       if(train_target[h] == 0) {
         best_index[best_f] <- h
         best_f <- best_f + 1
@@ -109,7 +105,7 @@ asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority in
   # Combine majority with new minority
   asn_train <<- rbind(samples, syntheticMq)
   return(paste0("The ASN SMOTE was applied to the data. The new training dataset is saved as asn_train."))
-}
+#}
 
 
 asn_smote(train, train_feat,train_target,10,5)
