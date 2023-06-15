@@ -27,10 +27,10 @@ ccdata[,-30] <- scale(ccdata[,-30])
 
 ##### Für K-fold Cross-Validation benötigte Basisfunktionen:
 ## Problem: 70% training ist schwierig mit Kreuzvalidierung abzubilden, d.h. 
-## anpassen auf 80%
-## -> K = 5 als Standardwert
+## anpassen auf 75%
+## -> K = 4 als Standardwert
 
-# Aufteilen des Datensatzes in 5 teile:
+# Aufteilen des Datensatzes in k teile:
 
 # Input: Anzahl in wie viele subsets geteilt werden soll, Datensatz
 splitIntoKSubsets <- function(K = 5, dataset = ccdata){
