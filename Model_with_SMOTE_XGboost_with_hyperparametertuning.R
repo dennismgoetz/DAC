@@ -465,6 +465,8 @@ tryRandomHyperparameter <- function (kForFold = 5,
   nDesiredRatioSMOTERange <- (nDesiredRatioSMOTERange[1]*100):(nDesiredRatioSMOTERange[2]*100)
   nRatioToTest <- sample(nDesiredRatioSMOTERange,1)/100
   kToTest <- sample(kForSMOTERange,1)
+   
+  cat("---------------------------- getestete Parameter: nRatio=", nRatioToTest, ", kSMOTE=", kToTest,  " ----------------------------")
   
   crossValidatedAUC <- kFoldCrossValidate(kForFold, entireDataset, kForSMOTE = kToTest, nDesiredRatioOfClassesForSMOTE = nRatioToTest)
   
@@ -485,14 +487,14 @@ tryRandomHyperparameter <- function (kForFold = 5,
 ## gespeichert werden
 
 testedHyperparameters <<- read.csv("hyperparameterTuning.csv")[,-1]
-colnames(testedHyperparameters) <- c("kFold", "kSMOTE", "nRatioSMOTE", "AUC Average")
+colnames(testedHyperparameters) <- c("kFold", "kSMOTE", "nRatioSMOTE", "AUCAverage")
 
-for (i in 1:20){
+for (i in 1:100){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
-    kForFold = 5,
+    kForFold = 4,
     entireDataset = ccdata,
-    kForSMOTERange = (1:15),
-    nDesiredRatioSMOTERange = c(0.5,1.2)
+    kForSMOTERange = (52:300), # HIER GGF. PARAMETER ANPASSEN
+    nDesiredRatioSMOTERange = c(0.98,1.02) # HIER GGF. PARAMETER ANPASSEN
   )
   
   testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
@@ -500,6 +502,33 @@ for (i in 1:20){
   
   write.csv(testedHyperparameters, "hyperparameterTuning.csv", row.names=TRUE)
 }
+
+
+
+## Daten plotten: 
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((testedHyperparameters$nRatioSMOTE > 0) * (testedHyperparameters$kFold==4)))
+
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot
+ggplot(dataToPlot, aes(x = kSMOTE, y = nRatioSMOTE, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "kSMOTE", y = "nRatioSMOTE", color = "AUCAverage") +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
 
 
 
