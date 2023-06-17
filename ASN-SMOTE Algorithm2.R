@@ -31,9 +31,9 @@ train_feat <- train[,1:29] #Features of train  (= T in the Pseudo Code)
 train_target <- train$Class #Target value of train
 
 
-k <- 5
-n <- 10
-#asn_smote <- function(data, train_feat, train_target, n, k) {  # !!! Minority instance = 1
+
+
+#asn_smote <- function(data, train_feat, train_target, n, k) {
   
   train_feat_matrix <- as.matrix(train_feat)
   train_Majority <- train[train_target == 0,]
@@ -47,59 +47,65 @@ n <- 10
   
   
   ##########################################################################################################
- 
-  min_index1 <- list()
-  for (i in 1:nrow(train_Minority_feat)) {
-    min_index1[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(k+1)]
-   
-  }
+  k <- 5
+  n <- 10
+  
+  
+  index_knn <- list()
   
   for (i in 1:nrow(train_Minority_feat)) {
+    index_knn[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(k+1)]
     for (j in 1:k) {
-      if (train_target[min_index1[[i]][j]] == 0 )
-       min_index1[[i]][j] <- NaN
+      if (train_target[index_knn[[i]][j]] == 0 ) {
+        index_knn[[i]][j] <- NaN
+      }
     }
   }
   
   Mu <- vector()
-  for (i in length(min_index1):1) {
-    if (is.nan(min_index1[[i]][1])) {
-      Mu[i] <- names(min_index1[i])
-      min_index1 <- min_index1[-i]
+  for (i in length(index_knn):1) { 
+    if (is.nan(index_knn[[i]][1])) {
+      Mu[i] <- names(index_knn[i])
+      index_knn <- index_knn[-i]
     }
   }
-  
+
   Mu <- na.omit(Mu) 
   Mu <- Mu[1:length(Mu)]
-
+  
+  
   for (i in 1:nrow(train_Minority_feat)) {
-    for (j in 1:k) {
-      if (is.nan(min_index1[[i]][j])) {
-        min_index1[[i]] <- min_index1[[i]][1:(j-1)]
-        break
+    if (i <= length(index_knn)) {
+      for (j in 1:k) {
+        if (is.nan(index_knn[[i]][j])) {
+          index_knn[[i]] <- index_knn[[i]][1:(j-1)]
+          break
+        }
       }
     }
   }
-
+  
+  
+  
 #  duplicates_list <- list()
-#  for (i in 1:length(min_index1)) {
+#  for (i in 1:length(index_knn)) {
 #    
-#    duplicates <- duplicated(min_index1[[i]])
+#    duplicates <- duplicated(index_knn[[i]])
 #    
 #    if (any(duplicates)) {
-#      duplicates_list[[i]] <- min_index1[[i]][duplicates]
+#      duplicates_list[[i]] <- index_knn[[i]][duplicates]
 #    }
 #    
 #  }
 #  duplicates_list
   
   synthetic <- list()
-  for(i in names(min_index1)) {
+  for(i in names(index_knn)) {
     for(j in seq_len(n)) {
-      nn <- sample(seq_along(min_index1[[i]]), 1)   # random number in the length of the best index
-      dif <- train_feat_matrix[min_index1[[i]][nn],] - train_feat_matrix[i,]  ## dif von der dis matrix
-      gap <- runif(1)
-      synthetic_instance <- train_feat_matrix[i,] + gap * dif
+      random_n <- sample(seq_along(index_knn[[i]]), 1)   # random number in the length of the best index
+      dif <- train_feat_matrix[index_knn[[i]][random_n],] - train_feat_matrix[i,]  ## dif von der dis matrix
+      randomNum <- runif(1)
+      synthetic_instance <- train_feat_matrix[i,] + randomNum * dif
       synthetic[[length(synthetic) + 1]] <- synthetic_instance
     }
   }
@@ -107,16 +113,16 @@ n <- 10
 
   ###########################################################################################################
 
-  # Combine the synthetic instances and their labels
+  # assign "Class" label = 1 to the synthtic points
   synthetic_df <- do.call(rbind, synthetic)
   synthetic_df <- as.data.frame(synthetic_df)
   synthetic_labels <- rep(1, length(synthetic))
   synthetic_df$Class <- synthetic_labels
 
-  # Combine majority with new minority
+  # Combine original train set with synthetic set
   asn_train <- rbind(train, synthetic_df)
 
-  # remove unqualified points
+  # remove unqualified points of minority class
   asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ]
   
   return(paste0("The ASN SMOTE was applied to the data. The new training dataset is saved as asn_train."))
