@@ -40,7 +40,7 @@ asn_smote <- function(data, train_feat, train_target, n, k) {
   train_Majority <- train[train_target == 0,]
   train_Minority <- train[train_target == 1,]
   
-  ####### [1:29] muss man noch ändern, sodass man Function für andere Datensätze replizieren kann
+  ####### [1:29] muss man noch Ã¤ndern, sodass man Function fÃ¼r andere DatensÃ¤tze replizieren kann
   train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
   
   # Algorithm 1: Noise filtering
@@ -102,17 +102,7 @@ asn_smote <- function(data, train_feat, train_target, n, k) {
     }
   }
   
-  # Variante Vinci
-  for (i in 1:nrow(train_Minority_feat)) {
-    if (i <= length(index_knn)) {
-      for (j in 1:k) {
-        if (is.nan(index_knn[[i]][j])) {
-          index_knn[[i]] <- index_knn[[i]][1:(j-1)]
-          break
-        }
-      }
-    }
-  }
+
 
 # Check for duplicates in each list of qualified neighbors
 #  # Create a duplicate
@@ -156,7 +146,7 @@ asn_smote <- function(data, train_feat, train_target, n, k) {
   asn_train <- rbind(train, synthetic_df)
 
   # remove unqualified points of minority class
-  asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ] #warum l�schen?
+  asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ] #warum löschen?
   
   return(paste0("The ASN SMOTE was applied to the data. The new training dataset is saved as asn_train."))
 }
