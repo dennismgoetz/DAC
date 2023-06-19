@@ -9,14 +9,15 @@ library(tibble)
 library(corrplot)
 
 # Load and preprocess data
-setwd("C:/Users/Vincent Bl/Desktop/DAC/")
+#setwd("C:/Users/Vincent Bl/Desktop/DAC/")
+setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master BAOR/05_Kurse/01_Business Analytics/04_Data Analytics Challenge/")
 ccdata <- read.csv("creditcard.csv")#[1:10000,]
 
 
 
 # Split into training/test set
 set.seed(123)
-split <- sample.split(ccdata$Class, SplitRatio = 0.7)
+split <- sample.split(ccdata$Class, SplitRatio = 0.9)
 train <- subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
 
@@ -33,13 +34,13 @@ train_target <- train$Class #Target value of train
 
 
 
-#asn_smote <- function(data, train_feat, train_target, n, k) {
+asn_smote <- function(data, train_feat, train_target, n, k) {
   
   train_feat_matrix <- as.matrix(train_feat)
   train_Majority <- train[train_target == 0,]
   train_Minority <- train[train_target == 1,]
   
-  ####### [1:29] muss man noch ändern sodass man Function für andere Datensätze replizieren kann
+  ####### [1:29] muss man noch ändern, sodass man Function für andere Datensätze replizieren kann
   train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
   
   # Algorithm 1: Noise filtering
@@ -53,6 +54,23 @@ train_target <- train$Class #Target value of train
   
   index_knn <- list()
   
+  # Tests
+  dis_matrix[1,]
+  order(dis_matrix[1,])
+  order(dis_matrix[1,])[1:6]
+  dis_matrix[1, 490]
+  dis_matrix[1, 71985]
+  dis_matrix[1, 24231]
+  
+  train[490,]
+  train_Minority_feat[1,]
+
+  sum(train_Minority_feat[1,] - train_feat[490,]) #sollte 0 sein (passt)
+  sum(train_Minority_feat[1,] - train_feat[24977,]) #sollte 4.352906 sein (passt nicht)
+  sum(abs(train_Minority_feat[1,] - train_feat[24977,]))
+  rownames(dis_matrix)[1]
+  
+  
   for (i in 1:nrow(train_Minority_feat)) {
     index_knn[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(k+1)]
     for (j in 1:k) {
@@ -62,6 +80,7 @@ train_target <- train$Class #Target value of train
     }
   }
   
+  
   Mu <- vector()
   for (i in length(index_knn):1) { 
     if (is.nan(index_knn[[i]][1])) {
@@ -70,10 +89,20 @@ train_target <- train$Class #Target value of train
     }
   }
 
-  Mu <- na.omit(Mu) 
+  Mu <- na.omit(Mu)
   Mu <- Mu[1:length(Mu)]
   
+  # Variante Dennis
+  for (i in 1:length(index_knn)) {
+    for (j in 1:k) {
+      if (is.nan(index_knn[[i]][j])) {
+        index_knn[[i]] <- index_knn[[i]][1:(j-1)]
+        break
+      }
+    }
+  }
   
+  # Variante Vinci
   for (i in 1:nrow(train_Minority_feat)) {
     if (i <= length(index_knn)) {
       for (j in 1:k) {
@@ -84,18 +113,22 @@ train_target <- train$Class #Target value of train
       }
     }
   }
-  
+
+# Check for duplicates in each list of qualified neighbors
+#  # Create a duplicate
+#  index_knn['258404']
+#  index_knn[['258404']][2] <- index_knn[['258404']][1]
+#  index_knn['258404']
   
   
 #  duplicates_list <- list()
 #  for (i in 1:length(index_knn)) {
-#    
+    
 #    duplicates <- duplicated(index_knn[[i]])
-#    
+    
 #    if (any(duplicates)) {
 #      duplicates_list[[i]] <- index_knn[[i]][duplicates]
 #    }
-#    
 #  }
 #  duplicates_list
   
@@ -109,7 +142,7 @@ train_target <- train$Class #Target value of train
       synthetic[[length(synthetic) + 1]] <- synthetic_instance
     }
   }
- 
+  
 
   ###########################################################################################################
 
@@ -123,10 +156,10 @@ train_target <- train$Class #Target value of train
   asn_train <- rbind(train, synthetic_df)
 
   # remove unqualified points of minority class
-  asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ]
+  asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ] #warum l�schen?
   
   return(paste0("The ASN SMOTE was applied to the data. The new training dataset is saved as asn_train."))
-#}
+}
 
 
 asn_smote(train, train_feat,train_target,10,5)
