@@ -1,5 +1,4 @@
 ################## VORBEREITUNG ################## 
-install.packages("ggplot2")
 # Load the necessary libraries
 library(tidyverse)
 library(randomForest)
@@ -11,6 +10,7 @@ library(tibble)
 library(xgboost)
 library(pROC)
 library(ggplot2)
+library(parallelMap)
 
 # Load the data
 setwd("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace")
@@ -59,6 +59,22 @@ mergeSubsetsIntoTrainAndTest <- function(whichSubsetAsTest = 1, subsetList = spl
     "train" = train))
 }
 # Output: List mit train und test - Datensatz
+
+##### Für Random - Undersampling
+# Input: undersamplingFaktor (0 = kein Undersampling, 0.99 = Um 99 %, also 1% der urspr. Anzahl), Trainingsdatensatz
+undersample <- function (undersamplingFactor = 1.00, dataset = ccdata){
+  # TRUE im SelectionVector heißt weiter benutzen, FALSE heißt verwerfen
+  selectionVector <- dataset$Class==1
+  selectionVector <- as.logical(
+    selectionVector
+    +
+    sample(c(0,1),length(dataset[,1]), prob = c(undersamplingFactor,1-undersamplingFactor), replace = TRUE)
+      )
+  
+  undersampledDataset <- dataset[selectionVector,]
+  return (undersampledDataset)
+}
+# Output: Trainingsdatensatz nach Undersampling
 
 
 ##### Single run of Model (SMOTE and ML algorithm):
@@ -197,21 +213,42 @@ kFoldCrossValidate <- function(kForFold = 4,
 
 # Input: kFold (für crossvalidation), der Datensatz, der auszuprobierende Wertebereich
 #       für k (SMOTE) und n (SMOTE, siehe auch Dokumentation von kFoldCrossValidate),
-tryRandomHyperparameter <- function (kForFold = 4,
-                                     entireDataset = ccdata,
-                                     kForSMOTERange = (1:15),
-                                     nDesiredRatioSMOTERange = c(0.5,1.2)
+#       gewünschtes Undersampling (0 = kein Undersampling)
+tryRandomHyperparameter <- function (kForFold,
+                                     entireDataset,
+                                     kForSMOTERange,
+                                     nDesiredRatioSMOTERange,
+                                     undersamplingFactorRange
                                      ){
+  kToTest <- numeric()
+  if (length(kForSMOTERange)==1){
+    kToTest <- kForSMOTERange[1]
+  } else {
+    kToTest <- sample(kForSMOTERange,1)
+  }
   
-  nDesiredRatioSMOTERange <- (nDesiredRatioSMOTERange[1]*100):(nDesiredRatioSMOTERange[2]*100)
-  nRatioToTest <- sample(nDesiredRatioSMOTERange,1)/100
-  kToTest <- sample(kForSMOTERange,1)
-   
-  cat("---------------------------- getestete Parameter: nRatio=", nRatioToTest, ", kSMOTE=", kToTest,  " ----------------------------")
+  nRatioToTest <- numeric()
+  if (length(nDesiredRatioSMOTERange)==1){
+    nRatioToTest <- nDesiredRatioSMOTERange[1]
+  } else {
+    nRatioToTest <- sample(nDesiredRatioSMOTERange,1)
+  }
+
+  undersamplingFactorToTest <- numeric()
+  if (length(undersamplingFactorRange)==1){
+    undersamplingFactorToTest <- undersamplingFactorRange[1]
+  } else {
+    undersamplingFactorToTest <- sample(undersamplingFactorRange,1)
+  }
+
+
+  cat("---------------------------- getestete Parameter: nRatio=", nRatioToTest, ", kSMOTE=", kToTest,", undersamplingFactor=", undersamplingFactorToTest,  " ----------------------------")
   
-  crossValidatedAUC <- kFoldCrossValidate(kForFold, entireDataset, kForSMOTE = kToTest, nDesiredRatioOfClassesForSMOTE = nRatioToTest)
+  undersampledDataset <- undersample(undersamplingFactorToTest, entireDataset)
   
-  resultVector <- c(kForFold, kToTest, nRatioToTest, crossValidatedAUC$AUCAverage)
+  crossValidatedAUC <- kFoldCrossValidate(kForFold, undersampledDataset, kForSMOTE = kToTest, nDesiredRatioOfClassesForSMOTE = nRatioToTest)
+  
+  resultVector <- c(kForFold, undersamplingFactorToTest, kToTest, nRatioToTest, crossValidatedAUC$AUCAverage)
   return(resultVector)
 }
 # Output: Vector der Testergebnisse mit: kFold (für crossvalidation), 
@@ -228,14 +265,15 @@ tryRandomHyperparameter <- function (kForFold = 4,
 ## gespeichert werden
 
 testedHyperparameters <<- read.csv("hyperparameterTuning.csv")[,-1]
-colnames(testedHyperparameters) <- c("kFold", "kSMOTE", "nRatioSMOTE", "AUCAverage")
+colnames(testedHyperparameters) <- c("kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
 
-for (i in 1:100){
+for (i in 1:500){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
-    kForFold = 4,
+    kForFold = 10,
     entireDataset = ccdata,
-    kForSMOTERange = (2:300), # HIER GGF. PARAMETER ANPASSEN
-    nDesiredRatioSMOTERange = c(0.5,1.3) # HIER GGF. PARAMETER ANPASSEN
+    kForSMOTERange = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70), # HIER GGF. PARAMETER ANPASSEN
+    nDesiredRatioSMOTERange = c(0.9, 1.0, 1.1), # HIER GGF. PARAMETER ANPASSEN
+    undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)  # HIER GGF. PARAMETER ANPASSEN
   )
   
   testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
@@ -246,19 +284,77 @@ for (i in 1:100){
 
 
 
-## Daten plotten: 
+## Daten plotten - Variante 1 (nSMOTE x kSMOTE plotten): 
 
 
-dataToPlot <- subset(testedHyperparameters, as.logical((testedHyperparameters$nRatioSMOTE > 0.2) * (testedHyperparameters$kSMOTE > 0) * (testedHyperparameters$kFold==4)))
-
+dataToPlot <- subset(testedHyperparameters, as.logical((
+    testedHyperparameters$nRatioSMOTE > 0.0) * 
+    (testedHyperparameters$kSMOTE > 0) * 
+    (testedHyperparameters$kFold==10) *
+    (testedHyperparameters$undersamplingFactor == 0)
+    ))
 
 # Convert nRATIO column from character to numeric
 dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
 
-# Create a scatter plot
+# Create a scatter plot - Variant 1 
 ggplot(dataToPlot, aes(x = kSMOTE, y = nRatioSMOTE, color = AUCAverage)) +
   geom_point(size = 5) +
   scale_color_gradient(low = "red", high = "blue") +
   labs(x = "kSMOTE", y = "nRatioSMOTE", color = "AUCAverage") +
   theme_minimal()
+
+
+## Daten plotten - Variante 2 (Undersampling x kSMOTE plotten): 
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE == 1) * 
+    (testedHyperparameters$kSMOTE < 200) * 
+    (testedHyperparameters$kFold==10) *
+    (testedHyperparameters$undersamplingFactor >= 0)
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = kSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "kSMOTE", y = "undersamplingFactor", color = "AUCAverage") +
+  theme_minimal()
+
+
+
+## Daten plotten - Variante 3 (Undersampling x nSMOTE plotten): 
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE > 0.2) * 
+    (testedHyperparameters$kSMOTE < 55) * 
+    (testedHyperparameters$kFold==10) *
+    (testedHyperparameters$undersamplingFactor >= 0)
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = nRatioSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "nRatioSMOTE", y = "undersamplingFactor", color = "AUCAverage") +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+
 
