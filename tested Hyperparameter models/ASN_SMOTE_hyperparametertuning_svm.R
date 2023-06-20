@@ -78,6 +78,126 @@ undersample <- function (undersamplingFactor = 1.00, dataset = ccdata){
 }
 # Output: Trainingsdatensatz nach Undersampling
 
+# ASN SMOTE
+asn_smote <- function(train, K = kSMOTE, dup_size = nSMOTE) {
+  
+  train_feat <- train[,1:29] #Features of train  (= T in the Pseudo Code)
+  train_target <- train$Class #Target value of train
+  
+  
+  train_feat_matrix <- as.matrix(train_feat)
+  train_Majority <- train[train_target == 0,]
+  train_Minority <- train[train_target == 1,]
+  
+  ####### [1:29] muss man noch Ã¤ndern, sodass man Function fÃ¼r andere DatensÃ¤tze replizieren kann
+  train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
+  
+  # Algorithm 1: Noise filtering
+  dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
+  
+  
+  ##########################################################################################################
+  
+  
+  index_knn <- list()
+  
+  # Tests
+  #dis_matrix[1,]
+  #order(dis_matrix[1,])
+  #order(dis_matrix[1,])[1:6]
+  #dis_matrix[1, 490]
+  #dis_matrix[1, 71985]
+  #dis_matrix[1, 24231]
+  
+  #train[490,]
+  #train_Minority_feat[1,]
+  
+  #sum(train_Minority_feat[1,] - train_feat[490,]) #sollte 0 sein (passt)
+  #sum(train_Minority_feat[1,] - train_feat[24977,]) #sollte 4.352906 sein (passt nicht)
+  #sum(abs(train_Minority_feat[1,] - train_feat[24977,]))
+  #rownames(dis_matrix)[1]
+  
+  
+  for (i in 1:nrow(train_Minority_feat)) {
+    index_knn[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(K+1)]
+    for (j in 1:K) {
+      if (train_target[index_knn[[i]][j]] == 0 ) {
+        index_knn[[i]][j] <- NaN
+      }
+    }
+  }
+  
+  
+  Mu <- vector()
+  for (i in length(index_knn):1) { 
+    if (is.nan(index_knn[[i]][1])) {
+      Mu[i] <- names(index_knn[i])
+      index_knn <- index_knn[-i]
+    }
+  }
+  
+  Mu <- na.omit(Mu)
+  Mu <- Mu[1:length(Mu)]
+  
+  # Variante Dennis
+  for (i in 1:length(index_knn)) {
+    for (j in 1:K) {
+      if (is.nan(index_knn[[i]][j])) {
+        index_knn[[i]] <- index_knn[[i]][1:(j-1)]
+        break
+      }
+    }
+  }
+  
+  
+  
+  # Check for duplicates in each list of qualified neighbors
+  #  # Create a duplicate
+  #  index_knn['258404']
+  #  index_knn[['258404']][2] <- index_knn[['258404']][1]
+  #  index_knn['258404']
+  
+  
+  #  duplicates_list <- list()
+  #  for (i in 1:length(index_knn)) {
+  
+  #    duplicates <- duplicated(index_knn[[i]])
+  
+  #    if (any(duplicates)) {
+  #      duplicates_list[[i]] <- index_knn[[i]][duplicates]
+  #    }
+  #  }
+  #  duplicates_list
+  
+  synthetic <- list()
+  for(i in names(index_knn)) {
+    for(j in seq_len(dup_size)) {
+      random_n <- sample(seq_along(index_knn[[i]]), 1)   # random number in the length of the best index
+      dif <- train_feat_matrix[index_knn[[i]][random_n],] - train_feat_matrix[i,]  ## dif von der dis matrix
+      randomNum <- runif(1)
+      synthetic_instance <- train_feat_matrix[i,] + randomNum * dif
+      synthetic[[length(synthetic) + 1]] <- synthetic_instance
+    }
+  }
+  
+  
+  ###########################################################################################################
+  
+  # assign "Class" label = 1 to the synthtic points
+  synthetic_df <- do.call(rbind, synthetic)
+  synthetic_df <- as.data.frame(synthetic_df)
+  synthetic_labels <- rep(1, length(synthetic))
+  synthetic_df$Class <- synthetic_labels
+  
+  # Combine original train set with synthetic set
+  asn_train <- rbind(train, synthetic_df)
+  
+  # remove unqualified points of minority class
+  #asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ] #warum löschen?
+  
+  return(asn_train)
+}
+
 
 ##### Single run of Model (SMOTE and ML algorithm):
 
@@ -86,9 +206,8 @@ singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   
   # Perform SMOTE
   set.seed(1234)
-  smote_ <- smotefamily::SMOTE(X = train[,-31], target = train$Class, K = kSMOTE, dup_size = nSMOTE)
-  training <- smote_$data
-  training <- training[,-31]
+  asn_train <- asn_smote(train, K = kSMOTE, dup_size = nSMOTE)
+  training <- asn_train
   training$Class <- as.factor(training$Class)
   
   
@@ -101,9 +220,9 @@ singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   learner <- makeLearner("classif.svm", predict.type = "prob")
   
   params <- makeParamSet(
-    makeNumericParam("cost", lower = 1, upper = 10),   # hier vllt die spanne kleiner
-    makeNumericParam("gamma", lower = 0.05, upper = 1),  # hier vllt die spanne kleiner
-    makeDiscreteParam("kernel", values = c( "linear", "polynomial","radial"))   
+    makeNumericParam("cost", lower = 0.1, upper = 10),  # hier vllt die spanne kleiner
+    makeNumericParam("gamma", lower = 0.001, upper = 1), # hier vllt die spanne kleiner
+    makeDiscreteParam("kernel", values = c( "linear", "polynomial","radial"))  
   )
   
   # Set the control for tuning
