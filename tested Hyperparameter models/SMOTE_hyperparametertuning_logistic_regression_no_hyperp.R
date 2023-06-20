@@ -13,6 +13,8 @@ library(ggplot2)
 library(parallelMap)
 
 # Load the data
+#setwd("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace")
+#setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master BAOR/05_Kurse/01_Business Analytics/04_Data Analytics Challenge/")
 setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 ccdata <- read.csv("creditcard.csv")
 

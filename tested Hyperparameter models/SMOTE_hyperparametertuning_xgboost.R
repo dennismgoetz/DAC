@@ -13,6 +13,8 @@ library(ggplot2)
 library(parallelMap)
 
 # Load the data
+#setwd("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace")
+#setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master BAOR/05_Kurse/01_Business Analytics/04_Data Analytics Challenge/")
 setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 ccdata <- read.csv("creditcard.csv")
 
@@ -100,15 +102,15 @@ singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   
   # Define the parameter set
   params <- makeParamSet(
-    makeIntegerParam("nrounds", lower = 100, upper = 1000),  # 100 500
-    makeNumericParam("eta", lower = 0.01, upper = 0.3)  # 0.05 0.3
+    makeIntegerParam("nrounds", lower = 100, upper = 500),  # 100 500
+    makeNumericParam("eta", lower = 0.05, upper = 0.3)  # 0.05 0.3
   )
   
   # Set the control for tuning
   ctrl <- makeTuneControlRandom(maxit=1L)
   
   # Set resampling strategy
-  rdesc <- makeResampleDesc("CV", iters = 5L)
+  rdesc <- makeResampleDesc("CV", iters = 2L)
   
   # Tune the hyperparameters
   tune_result <- tuneParams(learner, task = task, resampling = rdesc, par.set = params, control = ctrl)
@@ -351,14 +353,3 @@ ggplot(dataToPlot, aes(x = nRatioSMOTE, y = undersamplingFactor, color = AUCAver
   scale_color_gradient(low = "red", high = "blue") +
   labs(x = "nRatioSMOTE", y = "undersamplingFactor", color = "AUCAverage") +
   theme_minimal()
-
-
-
-
-
-
-
-
-
-
-
