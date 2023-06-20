@@ -11,9 +11,14 @@ library(xgboost)
 library(pROC)
 library(ggplot2)
 library(parallelMap)
+library(parallel)
+library(glmnet)
+library(tidymodels)
+
+
 
 # Load the data
-setwd("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace")
+setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 ccdata <- read.csv("creditcard.csv")
 
 # Preprocessing
@@ -78,9 +83,10 @@ undersample <- function (undersamplingFactor = 1.00, dataset = ccdata){
 
 
 ##### Single run of Model (SMOTE and ML algorithm):
+parallelStartSocket(detectCores())
 
 # Input: Hyperparameter von SMOTE, Train und Testdatensatz
-singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test){
+singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test) {
   
   # Perform SMOTE
   set.seed(1234)
@@ -90,70 +96,65 @@ singleModelRun <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   training$Class <- as.factor(training$Class)
   
   
-  ## train the random forest algorithm on the training data using the mlr and tidyverse packages
+  ## Train the logistic regression algorithm on the training data using tidymodels
   
-  # Define the task
-  task <- makeClassifTask(data = training, target = "Class")
+  # Define the logistic regression model
+  log_reg <- logistic_reg(mode = "classification", engine = "glmnet", penalty = tune(), mixture = tune())
   
-  # Set the learner
-  learner <- makeLearner("classif.xgboost", predict.type = "prob")
+  # Define the grid search for the hyperparameters
+  grid <- grid_regular(penalty(), mixture(), levels = c(penalty = 1, mixture = 1))
   
-  # Define the parameter set
-  params <- makeParamSet(
-    makeIntegerParam("nrounds", lower = 100, upper = 100),
-    makeNumericParam("eta", lower = 0.3, upper = 0.3),
-    makeNumericParam("max_depth", lower = 3, upper = 3),
-    makeNumericParam("min_child_weight", lower = 3, upper = 3),
-    makeNumericParam("subsample", lower = 0.5, upper = 0.5),
-    makeNumericParam("colsample_bytree", lower = 0.5, upper = 0.5)
+  # Define the workflow for the model
+  log_reg_wf <- workflow() %>%
+    add_model(log_reg) %>%
+    add_formula(Class ~ .)
+  
+  # Define the resampling method for the grid search
+  folds <- vfold_cv(data = training, v = 2)
+  
+  # Tune the hyperparameters using the grid search
+  
+  
+  log_reg_tuned <- tune_grid(
+    log_reg_wf,
+    resamples = folds,
+    grid = grid,
+    control = control_grid(save_pred = TRUE)
   )
   
-  # Set the control for tuning
-  ctrl <- makeTuneControlGrid()
+  # Select the best model based on the metric
+  best_model <- select_best(log_reg_tuned, metric = "roc_auc")
   
-  # Set resampling strategy
-  rdesc <- makeResampleDesc("CV", iters = 5L)
+  # Extract the best hyperparameters from the tibble object
+  best_penalty <- best_model$penalty
+  best_mixture <- best_model$mixture
   
-  # Tune the hyperparameters
-  tune_result <- tuneParams(learner, task = task, resampling = rdesc, par.set = params, control = ctrl)
+  # Fit the model using the optimal hyperparameters
+  log_reg_final <- logistic_reg(penalty = best_penalty, mixture = best_mixture) %>%
+    set_engine("glmnet") %>%
+    set_mode("classification") %>%
+    fit(Class~., data = training)
   
-  # Print the results
-  print(tune_result)
-  
-  # Set the tuned parameters
-  learner_tuned <- setHyperPars(learner, par.vals = tune_result$x)
-  
-  # Train the model
-  final_model <- mlr::train(learner_tuned, task)
-  
-  # Make predictions on the test set
-  test$Class <- as.factor(test$Class)
-  
-  # Make predictions on the test set
-  test_pred <- predict(final_model, newdata = test, type = "prob")
+  # Evaluate the model performance on the testing set
+  pred_class <- predict(log_reg_final,
+                        new_data = test,
+                        type = "class")
   
   # Calculate AUC
-  roc_obj <- performance(test_pred, measures = mlr::auc)
-  #print(roc_obj)
-  ######      auc 
-  ######   0.9765212
-  
-  auc <- roc(test$Class, as.numeric(test_pred$data$response))
-  #plot(auc, main = paste0("AUC= ", round(pROC::auc(auc),4)), col = "blue")
-  
+  auc <- roc(test$Class, as.numeric(pred_class$.pred_class))
   
   ## Generate confusion matrix
   # Convert to factor
-  test_pred$data$response <- as.factor(test_pred$data$response)
-  test_pred$data$truth <- as.factor(test_pred$data$truth)
+  model_pred <- as.factor(pred_class$.pred_class)
+  model_true <- as.factor(test$Class)
   
-  cm = confusionMatrix(data = test_pred$data$response, reference = test_pred$data$truth)
-  #print(cm)
+  cm <- confusionMatrix(data = model_pred, reference =model_true)
   
-  return(list(
-    "ROC" = roc_obj, 
+  return(list( 
     "AUC" = auc$auc, 
-    "ConfusionMatrix" = cm))
+    "ConfusionMatrix" = cm,
+    "Penalty" = best_penalty,
+    "Mixture" = best_mixture))
 }
 # Output: List mit auc, roc und confusion matrix
 
@@ -195,7 +196,9 @@ kFoldCrossValidate <- function(kForFold = 4,
 
   return(list(
     "AUCResultsOfSingleRuns" = vectorOfAOCresults, 
-    "AUCAverage" = mean(vectorOfAOCresults) 
+    "AUCAverage" = mean(vectorOfAOCresults),
+    "Hyper_pen" = resultsOfSingleRun$Penalty,
+    "Hyper_mix" = resultsOfSingleRun$Mixture
   ))
 }
 # Output: List mit Durchschnitts-AUC und Vektor der AUCs der einzelnen Durchläufe 
@@ -248,7 +251,9 @@ tryRandomHyperparameter <- function (kForFold,
   
   crossValidatedAUC <- kFoldCrossValidate(kForFold, undersampledDataset, kForSMOTE = kToTest, nDesiredRatioOfClassesForSMOTE = nRatioToTest)
   
-  resultVector <- c(kForFold, undersamplingFactorToTest, kToTest, nRatioToTest, crossValidatedAUC$AUCAverage)
+  resultVector <- c(kForFold, undersamplingFactorToTest, kToTest, nRatioToTest, crossValidatedAUC$AUCAverage, crossValidatedAUC$Hyper_pen, crossValidatedAUC$Hyper_mix)
+
+  
   return(resultVector)
 }
 # Output: Vector der Testergebnisse mit: kFold (für crossvalidation), 
@@ -264,8 +269,12 @@ tryRandomHyperparameter <- function (kForFold,
 ## intensiv ist. D.h. sollen alle Parameter in hyperparameterTuning.csv 
 ## gespeichert werden
 
-testedHyperparameters <<- read.csv("hyperparameterTuning.csv")[,-1]
-colnames(testedHyperparameters) <- c("kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
+
+
+#testedHyperparameters <- read.csv("testedHyperparameters_logreg2.csv")[,-1]
+col_names <- c("kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage", "Hyperp. penalty", "Hyperp. mixture")
+hyperparameter_results <- data.frame(matrix(ncol= length(col_names),nrow=0))
+colnames(hyperparameter_results) <- col_names
 
 for (i in 1:500){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
@@ -273,15 +282,18 @@ for (i in 1:500){
     entireDataset = ccdata,
     kForSMOTERange = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70), # HIER GGF. PARAMETER ANPASSEN
     nDesiredRatioSMOTERange = c(0.9, 1.0, 1.1), # HIER GGF. PARAMETER ANPASSEN
-    undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)  # HIER GGF. PARAMETER ANPASSEN
+    undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)  # HIER GGF. PARAMETER ANPASSEN  
   )
   
-  testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
+  newRandomHyperparameterTestResult <- c(newRandomHyperparameterTestResult)
+  hyperparameter_results <<- rbind(hyperparameter_results, newRandomHyperparameterTestResult)
   cat("---------------------------- Abgeschlossener Durchlauf: ", i, " ----------------------------")
   
-  write.csv(testedHyperparameters, "hyperparameterTuning.csv", row.names=TRUE)
+  write.csv(hyperparameter_results, "testedHyperparameters_logreg2.csv", row.names=TRUE)
 }
+hyperparameter_results
 
+parallelStop()
 
 
 ## Daten plotten - Variante 1 (nSMOTE x kSMOTE plotten): 
