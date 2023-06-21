@@ -10,6 +10,7 @@ library(corrplot)
 
 # Load the data
 setwd("C:/Users/Vincent Bl/Desktop/DAC/")
+setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
 ccdata <- read.csv("creditcard.csv")
 
 # look at the data
@@ -25,8 +26,6 @@ table(ccdata$Class)     # absolute amount of class membership
 ccdata$Class <- as.numeric(ccdata$Class)
 corr_plot <- corrplot(cor(ccdata[,-c(1)]), method = "circle", type = "upper")
 
-# data visualization
-ggplot(ccdata, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
 
 
 
@@ -48,32 +47,22 @@ table(train$Class)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 target <- ccdata$Class
-feature <- ccdata[,-c(1,31)]
+feature <- ccdata[,-30]
 
 ### SMOTE
 set.seed(1234)
 smote_ <- smotefamily::SMOTE(X = feature, target= target, K= 5, dup_size=577)
 training <- (smote_$data)
-training <- training[,-31]
 
 table(training$Class)
 prop.table(table(training$Class))
+
+# data visualization before SMOTE
+ggplot(ccdata, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+
+# data visualization after SMOTE
+ggplot(training, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
 
 
 

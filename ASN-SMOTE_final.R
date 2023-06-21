@@ -25,7 +25,6 @@ train <- train[,-1] %>% mutate_at(vars(-Class), scale)
 test <- test[,-1] %>% mutate_at(vars(-Class), scale)
 
 
-
 # ASN-SMOTE function
 asn_smote <- function(train, n, k) {
   
@@ -40,7 +39,7 @@ asn_smote <- function(train, n, k) {
   
   # Select only the features of the minority train set (P in the Pseudo code)
   train_Minority_feat <- train_Minority[,1:29]
-  
+
   # Calculate the distance of each minority instance to all samples of the train set
   dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
   
@@ -58,9 +57,9 @@ asn_smote <- function(train, n, k) {
   }
   
   print("Distance matrix calculated and nearest neighbors defined.")
+  print("--------------------------------------------------------------------------------")
   
   
-  ##########################################################################################################
   
   # Algorithm 1: Filter Noise
   # Drop minority instances with a majority (NaN) as nearest neighbor
@@ -73,7 +72,10 @@ asn_smote <- function(train, n, k) {
     }
   }
   
+  print(paste0("Number of qulaified minority instances: ", length(index_knn), 
+               " of ", nrow(train_Minority)))
   print("Algorithm 1 successfully completed.")
+  print("--------------------------------------------------------------------------------")
   
   
   # Algorithm 2: Adaptive neighbor instances selection
@@ -86,9 +88,12 @@ asn_smote <- function(train, n, k) {
       }
     }
   }
-  
-  print("Algorithm 2 successfully completed.")
 
+  print(paste0("Mean qualified nearest neighbors: ", 
+               round(sum(lengths(index_knn))/length(index_knn), 2), " of ", k))
+  print("Algorithm 2 successfully completed.")
+  print("--------------------------------------------------------------------------------")
+  
   
   # Algorithm 3: Procedure of ASN-SMOTE (Create new synthetic minority samples)
   # Add to the feature values of each qualified minority instance the difference of the minority sample and one
@@ -104,10 +109,11 @@ asn_smote <- function(train, n, k) {
     }
   }
   
+  print(paste0("Number of generated synthetic minority samples: ", length(synthetic)))
   print("Algorithm 3 successfully completed.")
+  print("--------------------------------------------------------------------------------")
   
   
-  ##########################################################################################################
   
   # Assign "Class" label = 1 to the synthtic points
   synthetic_df <- do.call(rbind, synthetic)
@@ -117,15 +123,20 @@ asn_smote <- function(train, n, k) {
   
   # Combine original train set with synthetic set
   asn_train <<- rbind(train, synthetic_df)
+  print("The ASN-SMOTE was applied to the data.")
   
-  return (print("The ASN-SMOTE was applied to the data. The new training dataset is saved as 'asn_train'."))
+  return (print("The new training dataset is saved as 'asn_train'."))
 }
 
 
 # Execute ASN-SMOTE function
 asn_smote(train, n=10, k=5)
 
+# Balanced dataset
+asn_smote(train, n=700, k=10)
+
 # View the new balance of the dataset
 table(asn_train$Class)
 
-
+# data visualization after ASN-SMOTE
+ggplot(asn_train, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after ASN-SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
