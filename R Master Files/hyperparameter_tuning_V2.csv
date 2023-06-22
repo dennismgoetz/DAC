@@ -1,0 +1,2 @@
+"","oversampling_altorithm","classifier","kFold","undersamplingFactor","kSMOTE","nRatioSMOTE","AUCAverage"
+"1","smote","logistic_regression",10,0.99,10,1,0.940654145126384
