@@ -21,8 +21,8 @@ train <- subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
 
 # Drop column 'Time' and scale column 'Amount'
-train <- train[,-1] %>% mutate_at(vars(-Class), scale)
-test <- test[,-1] %>% mutate_at(vars(-Class), scale)
+train <- train[,-1] %>% mutate(Amount = scale(Amount))
+test <- test[,-1] %>% mutate(Amount = scale(Amount))
 
 
 # ASN-SMOTE function
