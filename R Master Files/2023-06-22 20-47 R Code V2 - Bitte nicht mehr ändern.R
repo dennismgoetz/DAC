@@ -713,13 +713,17 @@ colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kF
 
 for (i in 1:500){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
-    oversampling_algorithm = sample(c("smote", "asn"),1), 
+    oversampling_algorithm = sample(c("smote", "asn"),1),
     classifier = sample(c("xgboost", "logistic_regression"),1), 
-    kForFold = 10,
     entireDataset = ccdata,
-    kForSMOTE = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70),
+    #kForFold = 10,
+    #kForSMOTE = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70),
+    #nDesiredRatioSMOTERange = 1.0,
+    #undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)
+    kForFold = 4,
+    kForSMOTE = c(2,4,6,8,10,12,16,20,25,30,35,40,50,60,70),
     nDesiredRatioSMOTERange = 1.0,
-    undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)
+    undersamplingFactor = c(0.80, 0.85, 0.90, 0.95, 0.99)
   )
   
   testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
