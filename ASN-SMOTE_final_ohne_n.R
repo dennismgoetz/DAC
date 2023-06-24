@@ -99,8 +99,10 @@ asn_smote <- function(train, k) {
   # Add to the feature values of each qualified minority instance the difference of the minority sample and one
   # random selected neighbor of their qualified neighbors multiplied with a random number between 0 and 1 for n times.
   
-  # Calculate the amount of synthetic minority samples that the train set is balanced
+  # Calculate the amount of synthetic minority samples for each qualified minority sample
+  # that the train set is balanced
   n <- as.integer((nrow(train_Majority) - nrow(train_Minority))/length(index_knn))
+  print(paste0("optimal n = ", n))
   
   synthetic <- list()
   for(i in names(index_knn)) {
@@ -128,14 +130,15 @@ asn_smote <- function(train, k) {
   # Combine original train set with synthetic set
   asn_train <<- rbind(train, synthetic_df)
   print("The ASN-SMOTE was applied to the data.")
+  print("The new training dataset is saved as 'asn_train'.")
   
-  return (print("The new training dataset is saved as 'asn_train'."))
+  # View the new balance of the dataset
+  return (table(asn_train$Class))
 }
 
 
 # Execute ASN-SMOTE function
 asn_smote(train, k=5)
 
-# View the new balance of the dataset
-table(asn_train$Class)
+
 

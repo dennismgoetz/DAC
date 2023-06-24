@@ -1,3 +1,48 @@
+---
+title: "Data Analytics Challenge - ASN-SMOTE"
+output: html_document
+date: "2023-07-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = TRUE,
+	warning = FALSE
+)
+```
+
+<style>
+p {
+  text-align: justify;
+}
+</style>
+
+
+Philipp von Lovenberg, Vincent Bläske, Dennis Götz
+
+## Inhaltsverzeichnis
+Einleitung<br>
+1. Data Exploration<br>
+2. ASN-SMOTE Algorithmus und Implementierung<br>
+3. Verwendete Classifier und Performance Measure<br>
+4. Cross-Validation<br>
+5. Undersampling<br>
+6. Hyperparameteroptimierung<br>
+7. Performance des ASN-SMOTE<br>
+8. Undersampling vor ASN-SMOTE<br>
+Ausblick
+
+
+## Einleitung
+Derzeit stellen unausgeglichene Datensätze eine erhebliche Herausforderung im Bereich des maschinellen Lernens und des Data Minings dar. Denn die herkömmlichen Klassifizierungsverfahren neigen in der Regel dazu, die Mehrheitsklasse zu bevorzugen, welche bei einem binären Klassifizierungsproblem oft ein Vielfaches an Instanzen gegenüber der Minderheitsklasse besitzt. Hierdurch wird der Klassifikator in seiner Vorhersagefähigkeit, die Minderheitsinstanzen korrekt zu erkennen, stark beeinträchtigt, kann jedoch trotzdem eine hohe Accuracy aufweisen. Die Minderheitsklasse kann dabei auch völlig unerkannt bleiben. Diese Thematik ist insbesondere bei der Erkennung betrügerischer Transaktionen in Banken, Kreditrisikobewertung oder Erkennung von Firewall-Eingriffen von hoher Relevanz. Aufgrund dieser universellen Existenz von unausgewogenen Datensätzen wurden bereits viele Vorverarbeitungsmethoden vorgeschlagen, um die Imbalance zu bewältigen. Oversampling ist eine vielversprechende Technik für unausgewogene Datensätze, die neue Minderheiteninstanzen erzeugt, um den Datensatz auszugleichen. Unter den Oversampling-Methoden ist die Synthetic Minority-Oversampling-Technique (SMOTE) eine der bekanntesten Methoden, die künstliche Minoritätsinstanzen durch lineare Interpolation erzeugt. Eine jüngst veröffentlichte Adaption dessen liefert im Paper „ASN-SMOTE: a synthetic minority oversampling method with adaptive qualified synthesizer selection“ von Yi Xinkai et al. (2022) vielversprechende Ergebnisse, weshalb dieser Algorithmus im Folgenden auf dem ‚Creditcard‘ Datensatz angewendet und seine Performance mithilfe zweier geeigneter Classifier mit dem originalen SMOTE Algorithmus verglichen wird. Dafür wird nach der Data Exploration im 1. Kapitel die Funktionsweise des ASN-SMOTE sowie die Unterschiede zum klassischen SMOTE in Kapitel 2 erläutert. Anschließend werden die verwendeten Classifier und das Performancemaß in Kapitel 3 sowie die gewählte Cross-Validation im 4. Kapitel präsentiert. Darauf folgt in Kapitel 5 und 6 eine Methode des Undersamplings und die Durchführung der Hyperparameteroptimierung. Abschließend werden die Ergebnisse des ASN-SMOTE in Kapitel 6 analysiert, bevor ein Ausblick mit weiteren Ideen und Forschungsfragen folgt. Zudem ist der Code des entsprechenden Abschnitts zur Nachvollziehbarkeit in der Programmiersprache R am Ende jedes Kapitels angehängt.
+
+
+
+
+## 1. Data Exploration
+```{r Data Exploration}
+
 # Load necessary packages
 library(tidyverse)
 library(randomForest)
@@ -23,6 +68,10 @@ test <- subset(ccdata, split == FALSE)
 # Drop column 'Time' and scale column 'Amount'
 train <- train[,-1] %>% mutate(Amount = scale(Amount))
 test <- test[,-1] %>% mutate(Amount = scale(Amount))
+```
+
+## 2. ASN-SMOTE Algorithmus
+```{r ASN-SMOTE Algorithmus}
 
 # ASN-SMOTE function
 asn_smote <- function(train, n, k) {
@@ -144,8 +193,9 @@ asn_smote <- function(train, n, k) {
   print("New balance of 'creditcard' dataset:")
   return (table(asn_train$Class))
 }
+```
 
-
+```{Execute ASN-SMOTE function}
 # Execute ASN-SMOTE function (optimal balanced with n=707)
 asn_smote(train, n=10, k=5)
 
@@ -156,4 +206,56 @@ plot(hist_qn, xlab = "Neighbors", ylab = "Frequency", xlim = c(0, 100), ylim = c
 
 
 # data visualization after ASN-SMOTE
-ggplot(asn_train, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after ASN-SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+#ggplot(asn_train, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after ASN-SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+```
+
+## 3. Verwendete Classifier und Performance Measure
+```{r Verwendete Classifier und Performance Measure}
+#Code
+```
+
+## 4. Cross-Validation
+```{r Cross-Validation}
+#Code
+```
+
+## 5. Undersampling
+```{r Undersampling}
+#Code
+```
+
+## 6. Hyperparameteroptimierung
+```{r Hyperparameteroptimierung}
+#Code
+```
+
+## 7. Performance des ASN-SMOTE
+```{r Performance des ASN-SMOTE}
+#Code
+```
+
+## 8. Undersampling vor ASN-SMOTE
+```{r Undersampling vor ASN-SMOTE}
+#Code
+```
+
+## Ausblick
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Aufgabengebiete Dennis Götz:
+Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Durcharbeiten des ASN-SMOTE Papers und der dazugehörigen Python Implementierung,
+Mitarbeit bei der R Implementierung des ASN-SMOTE und des Modells der logistischen Regression, Mitarbeit bei der Erstellung des R Markdown Dokuments.
