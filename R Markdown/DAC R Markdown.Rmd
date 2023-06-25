@@ -35,12 +35,14 @@ Ausblick
 
 
 ## Einleitung
-Derzeit stellen unausgeglichene Datensätze eine erhebliche Herausforderung im Bereich des maschinellen Lernens und des Data Minings dar. Denn die herkömmlichen Klassifizierungsverfahren neigen in der Regel dazu, die Mehrheitsklasse zu bevorzugen, welche bei einem binären Klassifizierungsproblem oft ein Vielfaches an Instanzen gegenüber der Minderheitsklasse besitzt. Hierdurch wird der Klassifikator in seiner Vorhersagefähigkeit, die Minderheitsinstanzen korrekt zu erkennen, stark beeinträchtigt, kann jedoch trotzdem eine hohe Accuracy aufweisen. Die Minderheitsklasse kann dabei auch völlig unerkannt bleiben. Diese Thematik ist insbesondere bei der Erkennung betrügerischer Transaktionen in Banken, Kreditrisikobewertung oder Erkennung von Firewall-Eingriffen von hoher Relevanz. Aufgrund dieser universellen Existenz von unausgewogenen Datensätzen wurden bereits viele Vorverarbeitungsmethoden vorgeschlagen, um die Imbalance zu bewältigen. Oversampling ist eine vielversprechende Technik für unausgewogene Datensätze, die neue Minderheiteninstanzen erzeugt, um den Datensatz auszugleichen. Unter den Oversampling-Methoden ist die Synthetic Minority-Oversampling-Technique (SMOTE) eine der bekanntesten Methoden, die künstliche Minoritätsinstanzen durch lineare Interpolation erzeugt. Eine jüngst veröffentlichte Adaption dessen liefert im Paper „ASN-SMOTE: a synthetic minority oversampling method with adaptive qualified synthesizer selection“ von Yi Xinkai et al. (2022) vielversprechende Ergebnisse, weshalb dieser Algorithmus im Folgenden auf dem ‚Creditcard‘ Datensatz angewendet und seine Performance mithilfe zweier geeigneter Classifier mit dem originalen SMOTE Algorithmus verglichen wird. Dafür wird nach der Data Exploration im 1. Kapitel die Funktionsweise des ASN-SMOTE sowie die Unterschiede zum klassischen SMOTE in Kapitel 2 erläutert. Anschließend werden die verwendeten Classifier und das Performancemaß in Kapitel 3 sowie die gewählte Cross-Validation im 4. Kapitel präsentiert. Darauf folgt in Kapitel 5 und 6 eine Methode des Undersamplings und die Durchführung der Hyperparameteroptimierung. Abschließend werden die Ergebnisse des ASN-SMOTE in Kapitel 6 analysiert, bevor ein Ausblick mit weiteren Ideen und Forschungsfragen folgt. Zudem ist der Code des entsprechenden Abschnitts zur Nachvollziehbarkeit in der Programmiersprache R am Ende jedes Kapitels angehängt.
+Derzeit stellen unausgeglichene Datensätze eine erhebliche Herausforderung im Bereich des maschinellen Lernens und des Data Minings dar. Denn die herkömmlichen Klassifizierungsverfahren neigen in der Regel dazu, die Mehrheitsklasse zu bevorzugen, welche bei einem binären Klassifizierungsproblem oft ein Vielfaches an Instanzen gegenüber der Minderheitsklasse besitzt. Hierdurch wird der Klassifikator in seiner Vorhersagefähigkeit, die Minderheitsinstanzen korrekt zu erkennen, stark beeinträchtigt, kann jedoch trotzdem eine hohe Accuracy aufweisen. Die Minderheitsklasse kann dabei auch völlig unerkannt bleiben. Diese Thematik ist insbesondere bei der Erkennung betrügerischer Transaktionen in Banken, Kreditrisikobewertung oder Erkennung von Firewall-Eingriffen von hoher Relevanz. Aufgrund dieser universellen Existenz von unausgewogenen Datensätzen wurden bereits viele Vorverarbeitungsmethoden vorgeschlagen, um die Imbalance zu bewältigen. Oversampling ist eine vielversprechende Technik für unausgewogene Datensätze, die neue Minderheiteninstanzen erzeugt, um den Datensatz auszugleichen. Unter den Oversampling-Methoden ist die Synthetic Minority-Oversampling-Technique (SMOTE) eine der bekanntesten Methoden, die künstliche Minoritätsinstanzen durch lineare Interpolation erzeugt. Eine jüngst veröffentlichte Adaption dessen liefert im Paper „ASN-SMOTE: a synthetic minority oversampling method with adaptive qualified synthesizer selection“ von Yi Xinkai et al. (2022) vielversprechende Ergebnisse, weshalb dieser Algorithmus im Folgenden auf dem ‚Creditcard‘ Datensatz angewendet und seine Performance mithilfe zweier geeigneter Classifier mit dem originalen SMOTE Algorithmus verglichen wird. Dafür wird nach der Data Exploration im 1. Kapitel die Funktionsweise des ASN-SMOTE sowie die Unterschiede zum klassischen SMOTE in Kapitel 2 erläutert. Anschließend werden die verwendeten Classifier und das Performancemaß in Kapitel 3 sowie die gewählte Cross-Validation im 4. Kapitel präsentiert. Darauf folgt in Kapitel 5 und 6 eine Methode des Undersamplings und die Durchführung der Hyperparameteroptimierung. Abschließend werden die Ergebnisse des ASN-SMOTE in Kapitel 6 analysiert, bevor ein Ausblick mit weiteren Ideen und Forschungsfragen folgt. Der Code des entsprechenden Abschnitts ist zur Nachvollziehbarkeit in der Programmiersprache R an jedes Kapitel angehängt.
 
 
 
 
 ## 1. Data Exploration
+Der zu behandelnde Datensatz „Creditdata“ beinhaltet europäische Kreditkartentransaktionen von September 2013 im CSV-Format und besitzt pro Transaktion 31 Features/Spalten, wobei die letzte binäre Spalte die Target darstellt. Diese definiert, ob ein Sample Fraud (1) ist oder kein Fraud (0). Das Ziel hierbei ist es ein Machine Learning Algorithmus zu trainieren, welcher mit Kreditkartenbetrug erkennen soll, um die Kunden vor unautorisierten Belastungen zu schützen. Die Daten sind ausschließlich numerisch und abgesehen von „Time“ und „Amount“ aus Datenschutzgründen mit PCA transformiert worden. Zu Beginn werden die notwendigen Packages geladen sowie die Working Directory in den Ordner gesetzt, worin sich der „Creditdata“ Datensatz befindet und mit read.csv eingelesen. Anschließend wird eine NA-Analyse durchgeführt und einige Statistiken der einzelnen Spalten berechnet. Die Imbalance des Datensatzes wird deutlich, wenn wir die Anzahl der Minority Samples mit den 284.315 der Majority vergleichen. Es befinden sich lediglich 492 Fraud Samples in Creditdata, was einem Prozentsatz von 0,17% entspricht. Dies deutet auf eine extreme Imbalance zwischen Majority und Minority hin und macht eine Preprocessingmethode umso bedeutender. Aufgrund der hohen Imbalance wird ein 90 zu 10 Split der Daten in Trainings- und Testdatensatz durchgeführt, worauf eine Trennung der Features von der Target Variable folgt. Da das Feature „Time“ als nicht aussagekräftig genug erscheint, wird dieses aus dem Datensatz entfernt und ebenfalls ein Scaling der Spalte „Amount“ vorgenommen, da diese nicht mit PCA transformiert wurde. Dies geschieht in Trainings- und Testdatensatz separat, um den Mittelwert und die Standardabweichung des Testdatensatzes nicht mit in den Trainingsdatensatz aufzunehmen, was andernfalls zu Overfitting führen würde. Beim Korrelationsplot der Features mit der Target Variable fallen einige positive als auch negative Korrelation beim Feature „Amount“ beispielsweise mit „V2“ und „V7“ auf. Die Target Value weist lediglich mit den Features „V12“, „V15“ und „V17“ einige niedrige negative Korrelation auf. Im Anschluss an die Data Exploration wird der in R bereits implementierte SMOTE Algorithmus aus dem Package smotefamily auf den Trainingsdatensatz angewendet, um eine Balance im Datensatz herzustellen. Nach der Generierung von xxx synthetischen Trainingsdaten beträgt der Anteil der Minority Samples im Train Set 49,97%.
+
 ```{r Data Exploration}
 
 # Load necessary packages
@@ -54,23 +56,65 @@ library(tibble)
 library(corrplot)
 
 
-# Load and preprocess data
+# Load the dataset
 #setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
 ccdata <- read.csv("creditcard.csv")
 
+# look at the data
+#View(ccdata)
+#summary(ccdata)         # summary statistics of the data
+colSums(is.na(ccdata))  # check for NA in the data
+table(ccdata$Class)     # absolute amount of class membership
+
+
+### Preprocessing
 # Split into training/test set
 set.seed(123)
 split <- sample.split(ccdata$Class, SplitRatio = 0.9)
 train <- subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
+table(train$Class)
 
-# Drop column 'Time' and scale column 'Amount'
+# Split features from the target value
+y_train <- train$Class
+X_train <- train[,-30]
+
+# Drop column 'Time' and scale column 'Amount' individually for train and test set
 train <- train[,-1] %>% mutate(Amount = scale(Amount))
 test <- test[,-1] %>% mutate(Amount = scale(Amount))
+
+
+### some data exploration (plot of time and amount for the 2 classes)
+# correlation
+corr_plot <- corrplot(cor(train[,-c(1)]), method = "circle", type = "upper")
+
+
+
+### Apply the original SMOTE Algorithmus to the train set
+# Calculate number of synthetic samples for each minority instance
+n_smote <- as.integer((255884 - 443)/443)
+
+set.seed(1234)
+smote_ <- smotefamily::SMOTE(X = X_train, target= y_train, K= 5, dup_size=n_smote)
+train_smote <- (smote_$data)
+
+# View the new balance in the dataset
+table(train_smote$Class)
+prop.table(table(train_smote$Class))
+
+# data visualization
+# Plot the first two features with the target value before SMOTE
+ggplot(train, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE") + scale_color_manual(values = c("#E69F00", "#56B4E9"))
+
+# Plot the first two features with the target value before SMOTE
+ggplot(train_smote, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
 ```
 
 ## 2. ASN-SMOTE Algorithmus
+...
+
+
 ```{r ASN-SMOTE Algorithmus}
 
 # ASN-SMOTE function

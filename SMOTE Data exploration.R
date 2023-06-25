@@ -8,8 +8,8 @@ library(mlr)
 library(tibble)
 library(corrplot)
 
-# Load the data
-setwd("C:/Users/Vincent Bl/Desktop/DAC/")
+# Load the dataset
+#setwd("C:/Users/Vincent Bl/Desktop/DAC/")
 setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
 ccdata <- read.csv("creditcard.csv")
 
@@ -20,51 +20,47 @@ colSums(is.na(ccdata))  # check for NA in the data
 table(ccdata$Class)     # absolute amount of class membership
 
 
-### some data exploration (plot of time and amount for the 2 classes)
-
-# correlation
-ccdata$Class <- as.numeric(ccdata$Class)
-corr_plot <- corrplot(cor(ccdata[,-c(1)]), method = "circle", type = "upper")
-
-
-
-
-
 ### Preprocessing
-
-#Remove time and scale amount 
-ccdata <- ccdata[,-1]
-
-ccdata[,-30] <- scale(ccdata[,-30])
-
-
-### Split into training/test set
+# Split into training/test set
 set.seed(123)
-split <- sample.split(ccdata$Class, SplitRatio = 0.7)
-train <-  subset(ccdata, split == TRUE)
+split <- sample.split(ccdata$Class, SplitRatio = 0.9)
+train <- subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
 table(train$Class)
 
+# Split features from the target value
+y_train <- train$Class
+X_train <- train[,-30]
+
+# Drop column 'Time' and scale column 'Amount' individually for train and test set
+train <- train[,-1] %>% mutate(Amount = scale(Amount))
+test <- test[,-1] %>% mutate(Amount = scale(Amount))
 
 
-target <- ccdata$Class
-feature <- ccdata[,-30]
+### some data exploration (plot of time and amount for the 2 classes)
+# correlation
+corr_plot <- corrplot(cor(train[,-c(1)]), method = "circle", type = "upper")
 
-### SMOTE
+
+
+### Apply the original SMOTE Algorithmus to the train set
+# Calculate number of synthetic samples for each minority instance
+n_smote <- as.integer((255884 - 443)/443)
+
 set.seed(1234)
-smote_ <- smotefamily::SMOTE(X = feature, target= target, K= 5, dup_size=577)
-training <- (smote_$data)
+smote_ <- smotefamily::SMOTE(X = X_train, target= y_train, K= 5, dup_size=n_smote)
+train_smote <- (smote_$data)
 
-table(training$Class)
-prop.table(table(training$Class))
+# View the new balance in the dataset
+table(train_smote$Class)
+prop.table(table(train_smote$Class))
 
-# data visualization before SMOTE
-ggplot(ccdata, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+# data visualization
+# Plot the first two features with the target value before SMOTE
+ggplot(train, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE") + scale_color_manual(values = c("#E69F00", "#56B4E9"))
 
-# data visualization after SMOTE
-ggplot(training, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
-
-
+# Plot the first two features with the target value before SMOTE
+ggplot(train_smote, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
 
 
 
