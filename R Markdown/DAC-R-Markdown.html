@@ -772,7 +772,32 @@ plot(hist_qn, xlab = &quot;Neighbors&quot;, ylab = &quot;Frequency&quot;, xlim =
 </div>
 <div id="verwendete-classifier-und-performance-measure" class="section level2">
 <h2>3. Verwendete Classifier und Performance Measure</h2>
+<div id="verwendete-classifier" class="section level3">
+<h3>3.1 Verwendete Classifier</h3>
+</div>
+<div id="performance-measure" class="section level3">
+<h3>3.2 Performance Measure</h3>
+<p>Die Leistung von Algorithmen für maschinelles Lernen wird in der
+Regel anhand einer Konfusionsmatrix bewertet und die
+Vorhersagegenauigkeit definiert als Accuracy = (T P + T N)/(T P + F P +
+T N + F N). Dabei ist die Fahlerrate 1 – Accuracy. Dies gilt jedoch nur
+im Zusammenhang mit ausgeglichenen Datensätzen und gleichen
+Fehlerkosten. Denn beim betrachteten Datensatz würde sogar ein Modell,
+welches immer die Majority prognostiziert, eine Accuracy von über 99%
+erreichen. Daher ist es bei unausgewogenen Datensätzen mit ungleichen
+Fehlerkosten sinnvoller, die Receiver Operating Characteristic Curve
+(ROC-Curve) oder die Area under the Curve (AUC) als Leistungsmaß zu
+verwenden. Hierbei wird auf der X-Achse die False-Positive-Rate %F P = F
+P/(T N+F P) und auf der Y-Achse die True-Positive-Rate %T P = T P/(T P
++F N) dargestellt. Der ideale Punkt auf der ROC-Kurve wäre (0,100),
+d. h. alle positiven Samples werden richtig klassifiziert und keine
+negativen Beispiele werden falsch als positiv klassifiziert. Die Linie y
+= x stellt das Szenario einer zufälligen Schätzung der Klasse dar. Zudem
+ist die Fläche unter der ROC Kurve (AUC) ein nützliches Maß für die
+Leistung des Klassifikators, da es unabhängig vom gewählten
+Entscheidungskriterium und den vorherigen Wahrscheinlichkeiten ist.</p>
 <pre class="r"><code>#Code</code></pre>
+</div>
 </div>
 <div id="cross-validation" class="section level2">
 <h2>4. Cross-Validation</h2>
