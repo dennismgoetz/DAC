@@ -1,6 +1,8 @@
 ---
 title: "Data Analytics Challenge - ASN-SMOTE"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 date: "2023-07-02"
 ---
 
@@ -435,21 +437,21 @@ performance <- function(title, pred) {
 
 
 ## Performance Logistic Regression mit SMOTE
-```{r Performance Comparison}
+```{r}
 performance("Logistische Regression mit SMOTE", pred_log_reg_smote)
 ```
 ## Peformance XGBoost mit SMOTE
-```{r Performance Comparison}
+```{r}
 performance("XGBoost mit SMOTE", pred_xgboost_smote)
 ```
 
 ## Peformance Logistische Regression mit ASN SMOTE
-```{r Performance Comparison}
+```{r}
 performance("Logistische Regression mit ASN SMOTE", pred_log_reg_asn_smote)
 ```
 
 ## Peformance XGBoost mit ASN SMOTE
-```{r Performance Comparison}
+```{r}
 performance("XGBoost mit ASN SMOTE", pred_xgboost_asn_smote)
 ```
 
