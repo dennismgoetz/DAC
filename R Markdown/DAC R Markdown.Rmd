@@ -51,12 +51,14 @@ library(caret)
 library(mlr)
 library(tibble)
 library(corrplot)
+library(pROC)
+library(ggplot2)
 ```
 
 ```{r Data Exploration}
 # Load the dataset
-#setwd("C:/Users/Vincent Bl/Desktop/DAC/")
-setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
+setwd("C:/Users/Vincent Bl/Desktop/DAC/")
+#setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
 ccdata <- read.csv("creditcard.csv")
 
 # look at the data
@@ -74,18 +76,17 @@ train <- subset(ccdata, split == TRUE)
 test <- subset(ccdata, split == FALSE)
 table(train$Class)
 
-# Split features from the target value
-y_train <- train$Class
-X_train <- train[,-30]
-
 # Drop column 'Time' and scale column 'Amount' individually for train and test set
 train <- train[,-1] %>% mutate(Amount = scale(Amount))
 test <- test[,-1] %>% mutate(Amount = scale(Amount))
 
+# Split features from the target value
+y_train <- train$Class
+X_train <- train[,-30]
 
 ### some data exploration (plot of time and amount for the 2 classes)
 # correlation
-corr_plot <- corrplot(cor(train[,-c(1)]), method = "circle", type = "upper")
+corr_plot <- corrplot(cor(train), method = "circle", type = "upper")
 ```
 
 
@@ -101,17 +102,27 @@ n_smote <- as.integer((255884 - 443)/443)
 set.seed(1234)
 smote_ <- smotefamily::SMOTE(X = X_train, target= y_train, K= 5, dup_size=n_smote)
 train_smote <- (smote_$data)
-
+train_smote$class <- as.numeric(train_smote$class)
+colnames(train_smote)[colnames(train_smote) == "class"] <- "Class"
 # View the new balance in the dataset
 table(train_smote$Class)
 prop.table(table(train_smote$Class))
 
 # data visualization
 # Plot the first two features with the target value before SMOTE
-ggplot(train, aes(x = V1, y = V2, color = factor(Class))) +geom_point() + ggtitle("Class distribution before SMOTE") + scale_color_manual(values = c("#E69F00", "#56B4E9"))
-
+ggplot(train, aes(x = V1, y = V2)) +
+  geom_point(data = train[train$Class == 0,], alpha = 0.3, color = "#E69F00") +  
+  geom_point(data = train[train$Class == 1,], alpha = 1, color = "#56B4E9") +
+  ggtitle("Class distribution before SMOTE") +
+  xlim(-30, 3) + 
+  ylim(-20, 20) 
 # Plot the first two features with the target value before SMOTE
-ggplot(train_smote, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+ggplot(train_smote, aes(x = V1, y = V2)) +
+  geom_point(data = train_smote[train_smote$Class == 0,], alpha = 0.3, color = "#E69F00") +  
+  geom_point(data = train_smote[train_smote$Class == 1,], alpha = 0.3, color = "#56B4E9") +
+  ggtitle("Class distribution after SMOTE (1:1)") +
+  xlim(-30, 3) + 
+  ylim(-20, 20) 
 ```
 
 
@@ -122,21 +133,20 @@ Allerdings können unsachgemäß erzeugte Minority Samples das Lernen des Classi
 
 # ASN-SMOTE function
 asn_smote <- function(train, n, k) {
-  
-  # Split the train set into features (T in the Pseudo Code) and target value
-  train_feat <- train[,1:29]
-  train_target <- train$Class
+
+  # Split the train set into features (X_train) (T in the Pseudo Code) and target value (y_train)
+
   
   # Create a matrix with the features and split the train set into majority and minority
-  train_feat_matrix <- as.matrix(train_feat)
-  train_Majority <- train[train_target == 0,]
-  train_Minority <- train[train_target == 1,]
+  train_feat_matrix <- as.matrix(X_train)
+  train_Majority <- train[y_train == 0,]
+  train_Minority <- train[y_train == 1,]
   
   # Select only the features of the minority train set (P in the Pseudo code)
   train_Minority_feat <- train_Minority[,1:29]
 
   # Calculate the distance of each minority instance to all samples of the train set
-  dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
+  dis_matrix <- proxy::dist(train_Minority_feat, X_train)
   
   # Create a list with indices of the k-nearest minority neighbors of all minority
   # instances (majority neighbors marked as NaN)
@@ -145,7 +155,7 @@ asn_smote <- function(train, n, k) {
   for (i in 1:nrow(train_Minority_feat)) {
     index_knn[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(k+1)]
     for (j in 1:k) {
-      if (train_target[index_knn[[i]][j]] == 0 ) {
+      if (y_train[index_knn[[i]][j]] == 0 ) {
         index_knn[[i]][j] <- NaN
       }
     }
@@ -158,11 +168,11 @@ asn_smote <- function(train, n, k) {
   
   # Algorithm 1: Filter Noise
   # Drop minority instances with a majority (NaN) as nearest neighbor
-  Mu <- vector()
+  Mu <<- vector()
   
   for (i in length(index_knn):1) { 
     if (is.nan(index_knn[[i]][1])) {
-      Mu[i] <- names(index_knn[i])
+      Mu[i] <<- names(index_knn[i])
       index_knn <- index_knn[-i]
     }
   }
@@ -244,7 +254,7 @@ asn_smote <- function(train, n, k) {
 
 ```{r Execute ASN-SMOTE function}
 # Execute ASN-SMOTE function (optimal balanced with n=707)
-asn_smote(train, n=10, k=5)
+train_asn_smote <- asn_smote(train, n=707, k=5)
 
 # Execute ASN-SMOTE function with high 'k' (very high k doesn't make sense!)
 asn_smote(train, n=10, k=100)
@@ -253,8 +263,18 @@ plot(hist_qn, xlab = "Neighbors", ylab = "Frequency", xlim = c(0, 100), ylim = c
 
 
 # data visualization after ASN-SMOTE
-#ggplot(asn_train, aes(x = V1, y = V2, color = factor(class))) + geom_point() + ggtitle("Class distribution after ASN-SMOTE")+ scale_color_manual(values = c("#E69F00", "#56B4E9"))
+ggplot(train_smote, aes(x = V1, y = V2)) +
+  geom_point(data = asn_train[asn_train$Class == 0,], aes(color = "Majority Class"), alpha = 0.3) + 
+  geom_point(data = asn_train[asn_train$Class == 1,], aes(color = "Minority Class"), alpha = 1) +
+  geom_point(data = train[Mu, ], aes(color = "Unqualified Minority Class"), alpha = 1, size = 3, shape = 21) +
+  ggtitle("Class distribution with unqualified data after ASN SMOTE") +
+  xlim(-30, 3) + 
+  ylim(-20, 20)+
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "red"),labels = c("Majority Class", "Minority Class", "Unqualified Minority Class")) +
+  guides(color = guide_legend())
 ```
+
+
 
 
 ## 3. Verwendete Classifier und Performancemaß
@@ -262,12 +282,206 @@ plot(hist_qn, xlab = "Neighbors", ylab = "Frequency", xlim = c(0, 100), ylim = c
 Um für das Testdatenset Vorhersagen treffen zu können, müssen wir erst ein Modell aufstellen und dieses tunen. Hierbei entscheiden wir uns für die Machine Learning Modelle der Logistischen Regression und des Random Forest. Die Logistische Regression eignet sich beispielsweise gut für die Schätzung der Wahrscheinlichkeiten von binären oder kategorialen abhängigen Variablen. Der grundlegende Ansatz der logistischen Regression besteht darin, dass eine Sigmoid-Funktion auf eine lineare Kombination der Features angewendet wird. Die Sigmoid-Funktion transformiert den linearen Ausdruck in einen Wert zwischen 0 und 1, der als Wahrscheinlichkeit interpretiert werden kann. Zudem findet eine Regularisierung statt, welche mit dem Hyperparameter C festgelegt wird. Dieser ist auch der einzige zu tunende Parameter im Modell, wodurch eine Cross-Validation mit geringerem Rechenleistung durchgeführt werden kann. Jedoch könnte die vom Modell angenommene lineare Beziehung zwischen den Features einen Nachteil darstellen. Im Bezug auf den Random Forest ist zu wissen, dass er zu den Ensemble-Lernverfahren gehört und für Klassifikations- und Regressionsaufgaben verwendet wird. Er besteht aus einer Kombination von Entscheidungsbäumen, die unabhängig voneinander trainiert werden. Dabei wird jeder Baum auf einer zufälligen Stichprobe der Trainingsdaten trainiert und betrachtet auch nur eine zufällige Teilmenge der verfügbaren Features. Dies hilft dem Modell, um Overfitting zu vermeiden und gut verallgemeinern zu können. Bei einer Klassifikationsaufgabe ist die Vorhersage üblicherweise eine Mehrheitsentscheidung der Bäume. Die Vorteile dieser Methode sind, dass der Random Forest problemlos mit großen Datenmengen arbeiten kann und nicht dazu neigt die Trainingsdaten auswendig zu lernen. Zudem schneidet er in der Praxis oft besser ab als andere Classifier. Beim Tuning sind jedoch deutlich mehr Hyperparameter zu optimieren, wodurch ein großer Rechenaufwand notwendig ist und das Modell ist meist schwieriger zu interpretieren als einfachere Verfahren, wie z.B. die Logistische Regression.
 
 
+```{r Logistische Regression}
+
+log_regression <- function(train) {
+    train$Class <- as.factor(train$Class)
+    
+    # Define the logistic regression model
+    log_reg <- logistic_reg(mode = "classification", engine = "glmnet", penalty = tune(), mixture = tune())
+    
+    # Define the grid search for the hyperparameters
+      # tries out 3 variations of the penalty hyperparameter and 4 varaitions of the mixture hyperparameter
+    grid <- grid_regular(penalty(), mixture(), levels = c(penalty = 3, mixture = 4)) 
+    
+    # Define the workflow for the model
+    log_reg_wf <- workflow() %>%
+      add_model(log_reg) %>%
+      add_formula(Class ~ .)
+    
+    # Define the resampling method for the grid search
+    folds <- vfold_cv(data = train, v = 5)                   
+    
+    # Tune the hyperparameters using the grid search
+    log_reg_tuned <- tune_grid(
+      log_reg_wf,
+      resamples = folds,
+      grid = grid,
+      control = control_grid(save_pred = TRUE)
+    )
+    
+    # Select the best model based on the metric
+    best_model <- select_best(log_reg_tuned, metric = "roc_auc")
+    
+    # Extract the best hyperparameters
+    best_penalty <- best_model$penalty
+    best_mixture <- best_model$mixture
+    
+    # Fit the model using the optimal hyperparameters
+    log_reg_final <- logistic_reg(penalty = best_penalty, mixture = best_mixture) %>%
+      set_engine("glmnet") %>%
+      set_mode("classification") %>%
+      fit(Class~., data = training)
+    
+    # Evaluate the model performance on the test set
+    pred_class <- predict(log_reg_final,
+                          new_data = test,
+                          type = "class")
+    
+    return(pred_class$.pred_class)
+    
+}
+
+```
+
+
+```{r XGBoost}
+
+xgboost <- function(train) {
+  
+    train$Class <- as.factor(train$Class)
+    # Define the task
+    classif_task <- makeClassifTask(id = "credit", data = train, target = "Class")     
+    
+    # Set the learner
+    learner <- makeLearner("classif.xgboost", predict.type = "prob", fix.factors.prediction = TRUE)
+    
+    # Define the parameter set
+    params <- makeParamSet(
+          makeIntegerParam("nrounds", lower = 100, upper = 500),
+          makeNumericParam("eta", lower = 0.05, upper = 0.3)
+          )
+    
+    # Set the control for tuning
+    ctrl <- makeTuneControlGrid()
+    
+    # Set resampling strategy
+    rdesc <- makeResampleDesc("CV", iters = 5L)
+    
+    # Tune the hyperparameters
+    tune_result <- tuneParams(learner, task = classif_task, resampling = rdesc, par.set = params, control = ctrl)
+    
+    # Set the tuned parameters
+    learner_tuned <- setHyperPars(learner, par.vals = tune_result$x)
+    
+    # Train the model
+    final_model <- mlr::train(learner_tuned, classif_task)
+    
+    # Make predictions on the test set
+    test$Class <- as.factor(test$Class)
+    test_pred <- predict(final_model, newdata = test, type = "prob")
+    
+    return(test_pred$data$response)
+}
+
+```
+
+```{r Train the Classifiers on Smote and on the ASN Smote}
+
+pred_log_reg_smote <- log_regression(train_smote)
+pred_xgboost_smote <- xgboost(train_smote)
+
+pred_log_reg_asn_smote <- log_regression(train_asn_smote)
+pred_xgboost_asn_smote <- xgboost(train_asn_smote)
+
+```
+
+
+
 ### 3.2 Performancemaß
 Die Leistung der Algorithmen des maschinellen Lernens wird in der Regel anhand einer Konfusionsmatrix bewertet und die Vorhersagegenauigkeit definiert als Accuracy = (T P + T N)/(T P + F P + T N + F N). Dabei ist die Fahlerrate 1 – Accuracy. Dies gilt jedoch nur im Zusammenhang mit ausgeglichenen Datensätzen und gleichen Fehlerkosten. Denn beim betrachteten Datensatz würde sogar ein Modell, welches immer die Majority prognostiziert, eine Accuracy von über 99% erreichen. Daher verwenden wir beim Creditdata Datensatz mit ungleichen Fehlerkosten, die Receiver Operating Characteristic Curve (ROC-Curve) und die Area under the Curve (AUC), um die Performance der Logistischen Regression und des Random Forests zu bestimmen. Hierbei wird auf der X-Achse die False-Positive-Rate %F P = F P/(T N+F P) und auf der Y-Achse die True-Positive-Rate %T P = T P/(T P +F N) dargestellt. Der ideale Punkt auf der ROC-Kurve wäre (0,100), d. h. alle positiven Samples werden richtig klassifiziert und keine negativen Beispiele werden falsch als positiv klassifiziert. Die Linie y = x stellt das Szenario einer zufälligen Schätzung der Klasse dar. Zudem ist die Fläche unter der ROC Kurve (AUC) ein nützliches Maß für die Leistung des Klassifikators, da es unabhängig vom gewählten Entscheidungskriterium und den vorherigen Wahrscheinlichkeiten ist.
 
-```{r Verwendete Classifier und Performance Measure}
-#Code
+```{r Performance Function}
+performance <- function(title, pred) {
+  
+  pred <- as.factor(pred)
+  test$Class <- as.factor(test$Class)
+  auc <- roc(test$Class, as.numeric(pred))
+
+  truth_predicted <- data.frame(
+    obs = test$Class,
+    pred = pred
+  )
+  
+  levels(truth_predicted$obs) <- c("not_Fraud", "Fraud")
+  levels(truth_predicted$pred) <- c("not_Fraud", "Fraud")
+  
+  cm <- conf_mat(truth_predicted, obs, pred)
+  
+  TP <- cm$table[2, 2]
+  FN <- cm$table[1, 2]
+  FP <- cm$table[2, 1]
+  TN <- cm$table[1, 1]
+  
+  # Sensitivity (true positive rate)
+  sensitivity <- TP / (TP + FN)
+  
+  # Specificity (true negative rate)
+  specificity <- TN / (TN + FP)
+  
+  cm_plot <- autoplot(cm, type = "heatmap") +
+                      scale_fill_gradient(low = "#D6EAF8", high = "#2E86C1") +
+                      labs(title = paste0(title, " Performance"),
+                      subtitle = paste0("AUC: ",round(pROC::auc(auc), 4), "\n","\n",
+                                        "Sensitivity: ", round(sensitivity,4),  
+                                        "  Specificity: ", round(specificity,4))) 
+
+  
+  
+  return(list(AUC = auc_plot, Confusion_Matrix = cm_plot, Sensitivity = sensitivity, Specificity = specificity))
+}
+
 ```
+
+
+## Performance Logistic Regression mit SMOTE
+```{r Performance Comparison}
+performance("Logistische Regression mit SMOTE", pred_log_reg_smote)
+```
+## Peformance XGBoost mit SMOTE
+```{r Performance Comparison}
+performance("XGBoost mit SMOTE", pred_xgboost_smote)
+```
+
+## Peformance Logistische Regression mit ASN SMOTE
+```{r Performance Comparison}
+performance("Logistische Regression mit ASN SMOTE", pred_log_reg_asn_smote)
+```
+
+## Peformance XGBoost mit ASN SMOTE
+```{r Performance Comparison}
+performance("XGBoost mit ASN SMOTE", pred_xgboost_asn_smote)
+```
+
+
+```{r Wo wurden die Fehler gemacht?}
+ggplot(train_smote, aes(x = V1, y = V2)) +
+  geom_point(data = train_smote[train_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
+  geom_point(data = train_smote[train_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
+  geom_point(data = test[pred_xgboost_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
+  ggtitle("FALSE NEGATIVE bei XGBoost mit SMOTE") +
+  xlim(-6, 3) + 
+  ylim(-3, 5) 
+
+ggplot(train_asn_smote, aes(x = V1, y = V2)) +
+  geom_point(data = train_asn_smote[train_asn_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
+  geom_point(data = train_asn_smote[train_asn_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
+  geom_point(data = test[pred_xgboost_asn_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
+  ggtitle("FALSE NEGATIVE bei XGBoost mit ASN SMOTE") +
+  xlim(-6, 3) + 
+  ylim(-3, 5) 
+
+
+```
+
+## Interpretation der Ergebnisse
+Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler (False Negative --> als nicht_fraud prognostiziert aber in Wahrheit Fraud) beim ASN Smote lagen (hier nur 2 dimensional), sieht man dass die Fehler in den selben Bereichen liegen. Der Unterschied liegt darin, dass bei der Anwendung des ASN Smotes, etwas mehr False negative entstanden sind (auch an der confusion matrix zu erkennen) 
+
+
+
+
+
+
 
 ## 4. Cross-Validation
 ```{r Cross-Validation}
