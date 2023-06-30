@@ -52,16 +52,20 @@ library(smotefamily)
 library(caret)
 library(mlr)
 library(tibble)
-library(corrplot)
+library(xgboost)
 library(pROC)
 library(ggplot2)
+library(parallelMap)
+library(parallel)
+library(glmnet)
+library(tidymodels)
+library(corrplot)
 ```
 
 ```{r Data Exploration}
 # Load the dataset
-setwd("C:/Users/Vincent Bl/Desktop/DAC/")
-#setwd("C:/Users/Dennis/OneDrive/Dokumente/03_Master/05_Kurse/01_BA/04_DAC/")
-ccdata <- read.csv("creditcard.csv")
+
+ccdata <- read.csv("~/creditcard.csv")
 
 # look at the data
 #View(ccdata)
@@ -482,20 +486,206 @@ Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler 
 
 
 
+## 4. Undersampling
+
+Der vorliegende Datensatz ist mit seinem Verhältnis zwischen Majority Class und Minority Class von ca. 578:1 deutlich stärker imbalanced als die Datensätze, mit denen ASN-SMOTE im dazugehörigen Paper getestet wurde (1,82 - 41,4). Deshalb und aufgrund der herausfordernden langen Laufzeiten wurde sich dafür entschieden, die majority class zu undersamplen. 
+
+Dafür wurde eine Funktion zum random undersampling implementiert. 
 
 
 
-## 4. Cross-Validation
-```{r Cross-Validation}
-#Code
+```{r Undersampling}
+
+# Input: undersamplingFaktor (0 = kein Undersampling, 0.99 = Um 99 %, also 1% der urspr. Anzahl), Trainingsdatensatz
+undersample <- function (undersamplingFactor = 0.99, dataset = ccdata){
+  # TRUE im SelectionVector heißt weiter benutzen, FALSE heißt verwerfen
+  selectionVector <- dataset$Class==1
+  selectionVector <- as.logical(
+    selectionVector
+    +
+      sample(c(0,1),length(dataset[,1]), prob = c(undersamplingFactor,1-undersamplingFactor), replace = TRUE)
+  )
+  
+  undersampledDataset <- dataset[selectionVector,]
+  return (undersampledDataset)
+}
+# Output: Datensatz nach Undersampling
+
+
 ```
 
-## 5. Undersampling
-```{r Undersampling}
-#Code
+```{r Undersampling Example}
+
+cat("Vor Undersampling: \n")
+table(ccdata$Class)
+
+cat("\n", "Nach Undersampling: \n")
+undersampled_data <- undersample(0.99, ccdata)
+table(undersampled_data$Class)
+
+cat("\n","undersampling um ", round((1-(table(undersampled_data$Class)[1]/table(ccdata$Class)[1])),4)*100, " % \n")
+
+```
+Dabei wird mit der Sample Funktion gearbeitet, wodurch das tatsächliche Verhältnis minimal abweichen kann. Nach ersten Tests mit dem Undersampling, SMOTE und XGBoost wurde davon ausgegangen, dass selbst starkes Undersampling keinen negativen Einfluss auf die Performance haben würde. 
+
+```{r impact of undersampling rate on performance, echo=FALSE}
+hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_v1.csv")[-1:-3]
+
+plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
+  hyperparameter_tuning_results_legacy_v1$nRatioSMOTE > 0.4) * 
+    (hyperparameter_tuning_results_legacy_v1$kSMOTE < 50) * 
+    (hyperparameter_tuning_results_legacy_v1$kFold==4)
+))[,c(2,5)])
+
+```
+
+
+## 5. Cross-Validation
+
+Um die Beurteilung der Performance von Machine-Learning Algorithmen noch zuverlässlicher zu machen, kann anstatt einem einzigen Subsetting in Test- und Trainingsdatensatz auch Cross-Validation angewendet werden. Damit wird das Risiko minimiert, dass die Ergebnisse von der zufälligen Auswahl der Samples abhängen, die in den Trainings- bzw. Testdatensatz aufgenommen werden. Das kann dadurch erreicht werden, dass der gesamte Datensatz in k gleich große Teile unterteilt wird. In mehreren Durchläufen wird daraufhin je eins dieser k Teile als Testdatensatz und die restlichen Teile als Trainingsdatensatz genutzt. Dabei werden alle k Kombinationen durchlaufen. 
+
+Bei der Implementierung und Umsetzung ist herausfordernd, dass die Cross-Validation durch das Durchlaufen der verschiedenen Kombinationen die Laufzeit im Vergleich zu einem einfachen Durchlauf erheblich erhöht. In so mehr Teile der Datensatz dabei unterteilt wird, desto mehr Kombinationen und damit längere Laufzeit entsteht. Daher wurde hier ein Wert von 4 gewählt, womit in jedem Durchlauf 75% des Datensatzes als Trainingsdaten und 25% als Testdaten genutzt werden. 
+
+Bei der Implementierung müssen zunächst Funktionen zum Teilen des Datensatzes in k Teile und zum Zusammenfügen erstellt werden:
+
+```{r Funktionen für Cross-Validation 1}
+
+
+# Aufteilen des Datensatzes in k teile:
+
+# Input: Anzahl in wie viele subsets geteilt werden soll, Datensatz
+splitIntoKSubsets <- function(K = 4, dataset = ccdata){
+  subsets <- list()
+  # split von 1-k
+  split <- sample(1:K, size = length(dataset[,1]), replace = TRUE)
+  for (i in 1:K){
+    subsets <- append(subsets, list(subset(dataset, split == i)))
+  }
+  return (subsets)
+}
+# Output: list mit den subsets
+
+
+```
+
+```{r Funktionen für Cross-Validation 2}
+## Auswählen des x-ten Datensatzes als Testdatensatz, zusammenfassen der restlichen als Trainingsdatensatz
+
+# Input: Index des Subsets welcher Testdatensatz sein soll, Liste mit Subsets
+mergeSubsetsIntoTrainAndTest <- function(whichSubsetAsTest = 1, subsetList = splitIntoKSubsets()){
+  test <- subsetList[[whichSubsetAsTest]]
+  train <- data.frame()
+  for (i in (1:length(subsetList))[-whichSubsetAsTest]){
+    train <- rbind(train, subsetList[[i]])
+  }
+  return(list(
+    "test" = test,
+    "train" = train))
+}
+# Output: List mit train und test - Datensatz
+```
+
+Die übergeordnete Funktion für die Cross Validation ruft einige zuvor definierte Funktionen auf. Beim Aufrufen der Funktion muss u.a. als Parameter eingegeben werden, welcher Oversampling-Algorithmus und Classifier genutzt werden soll, wie stark die Majority Class undersampled werden soll, in wie viele Teile der Datensatz unterteilt werden soll (entspricht Anzahl der Kombinationen der Cross Validation) und wie das Verhältnis zwischen Minority und Majority Class nach Under- & Oversampling in den Trainingsdatensätzen sein soll. 
+
+Bei der Betrachtung der Implementierung der Funktion "splitIntoKSubsets" fällt auf, dass das Verhältnis zwischen Minority und Majority Klasse nach dem Teilen nicht in jedem Subset gleich sein wird. Außerdem können die Trainigsdatensätze später noch undersampled werden. Darauf ergibt sich eine Herausforderung für das Setzen des Parameters N von SMOTE. Möchten wir nach dem SMOTEN von jedem dieser Trainingsdatensätze in diesem ein Verhältnis von z.B. 1:1 zwischen Majority und Minority Class haben, müssten wir den dafür benötigten N Wert für jedes Subset unter Berücksichtigung des Undersampling Faktors neu bestimmen. Daher wurde hier implementiert, dass für jedes Subset der für ein gewünschtes Zielverhältnis ("nDesiredRatioOfClassesForSMOTE") benötigte N Parameter für SMOTE ("nAbsoluteSMOTE") berechnet wird. 
+
+
+```{r Cross-Validation}
+
+##### K-fold Cross-Validation:
+## Einmal Datensatz splitten
+## schleife von 1:k, jedes mal ein anderes Subset als Testdatensatz wählen
+## in der Schleife: Aktuellen Test und Train-Datensatz in Model geben & AOC speichern
+## Nach durchlauf der Schlaufe: Durchschnitt von AOC bilden & returnen
+
+# Input: gewünschte Algorithmen, Anzahl der gewünschten Subsets für Crossvalidation, Datensatz, Parameter für SMOTE
+kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, entireDataset, undersampling_factor, kForSMOTE, nDesiredRatioOfClassesForSMOTE){
+  subsets <- splitIntoKSubsets(K = kForFold, dataset = entireDataset)
+  vectorOfAOCresults <- c()
+  for (i in 1:length(subsets)){
+    inputDataForModelRun <- mergeSubsetsIntoTrainAndTest(whichSubsetAsTest = i, subsetList = subsets)
+    
+    # UNDERSAMPLING : 
+    #print(undersampling_factor)
+    #print(table(inputDataForModelRun$train$Class))
+    undersampled_train <- undersample(undersampling_factor, inputDataForModelRun$train)
+    #print(table(inputDataForModelRun$train$Class))
+    
+    
+    
+    # da in jedem subset ein leicht anderes anderes Verhältnis von min zu maj
+    # klasse vorliegt, sollte der N parameter für jedes subset bestimmt werden.
+    # nDesiredRatioOfClassesForSMOTE von 100% (= 1) bedeutet dabei, 
+    # dass nach SMOTE gleich viele minority wie 
+    # majority samples im Datensatz sein sollen (100% bedeutet also gleich viele,
+    # das sollte wieder einen absoluten n Wert von ca. 577 ergeben)
+    # Das Hyperparametertuning erfolgt somit später mit prozentwerten statt
+    # absoluten werten. z.B. 120% (=1.2) würde also bedeuten, wir wollen
+    # 20% mehr minority als majority samples nach SMOTE
+    nAbsoluteSMOTE <- table(undersampled_train$Class)[1]/table(undersampled_train$Class)[2]
+    nAbsoluteSMOTE <- round((nAbsoluteSMOTE-1)*nDesiredRatioOfClassesForSMOTE)
+    
+    
+    resultsOfSingleRun <- list()
+    
+    if (classifier == "xgboost"){
+      if (oversampling_algorithm == "smote"){
+        cat("run_smote_with_xgboost - with N = ",nAbsoluteSMOTE)
+        resultsOfSingleRun <- run_smote_with_xgboost(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE, train = undersampled_train, test = inputDataForModelRun$test)
+      }
+      else if (oversampling_algorithm == "asn"){
+        cat("run_asn_smote_with_xgboost - with N = ",nAbsoluteSMOTE)
+        resultsOfSingleRun <- run_asn_smote_with_xgboost(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE,  train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
+      }
+      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
+    }
+    else if (classifier == "logistic_regression"){
+      if (oversampling_algorithm == "smote"){
+        cat("run_smote_with_logistic_regression - with N = ",nAbsoluteSMOTE)
+        resultsOfSingleRun <- run_smote_with_logistic_regression(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE, train = undersampled_train, test = inputDataForModelRun$test)
+      }
+      else if (oversampling_algorithm == "asn"){
+        cat("run_asn_smote_with_logistic_regression - with N = ",nAbsoluteSMOTE)
+        resultsOfSingleRun <- run_asn_smote_with_logistic_regression(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE, train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
+      }
+      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
+    }
+    else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
+    
+    
+    vectorOfAOCresults <- c(vectorOfAOCresults, resultsOfSingleRun$AUC)
+  }
+
+  return(list(
+    "AUCResultsOfSingleRuns" = vectorOfAOCresults, 
+    "AUCAverage" = mean(vectorOfAOCresults),
+    "oversampling_algorithm" = oversampling_algorithm, 
+    "classifier" = classifier
+  ))
+}
+# Output: verwendete Algorithmen, List mit Durchschnitts-AUC, Vektor der AUCs der einzelnen Durchläufe und dem verwendeten Classifier und oversampling algorithmus
+
 ```
 
 ## 6. Hyperparameteroptimierung
+
+zu N: In ersten Tests mit SMOTE und XGBoost kaum Einfluss auf die Performance
+(außer Extremwerte die so niedrig sind das de facto nicht mehr gesmotet wird -> dann nähert sich performance an die Performance ohne SMOTE an). Daher entscheidung nratiosmote nicht zu optimieren, das Verhältnis im Datensatz nach SMOTE/ASN soll also immer 1:1 sein. 
+
+```{r impact of n on performance, echo=FALSE}
+hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_v1.csv")[-1:-3]
+
+plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
+  hyperparameter_tuning_results_legacy_v1$undersamplingFactor == 0) * 
+    (hyperparameter_tuning_results_legacy_v1$kSMOTE < 100) * 
+    (hyperparameter_tuning_results_legacy_v1$kFold==4)
+))[,c(4,5)])
+
+```
+
+Hyperp....
+
+
 ```{r Hyperparameteroptimierung}
 #Code
 ```
