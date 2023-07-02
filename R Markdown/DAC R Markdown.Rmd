@@ -65,7 +65,7 @@ library(corrplot)
 ```{r Data Exploration}
 # Load the dataset
 
-ccdata <- read.csv("~/creditcard.csv")
+ccdata <- read.csv("creditcard.csv")
 
 # look at the data
 #View(ccdata)
@@ -254,7 +254,7 @@ asn_smote <- function(train, n, k) {
   
   # View the new balance of the dataset
   print("New balance of 'creditcard' dataset:")
-  return (table(asn_train$Class))
+  return (asn_train)
 }
 ```
 
@@ -280,12 +280,28 @@ ggplot(train_smote, aes(x = V1, y = V2)) +
   guides(color = guide_legend())
 ```
 
-
+## Unterschiede bei der Generierung der synthetischen Daten
+Im Vergelich zum Plot in dem der SMOTE abgebildet wurde, erkennt man Unterschiede wo der Asn SMOTE andere Ergebnisse liefert. Während der Smote einen größeren Bereich abdeckt, in dem die synthetischen Daten entstehen, “ignoriert” der ASN Smote manche Bereiche (Hier im Bereich … zu erkennen). Zusammenfassend lässt sich jedoch sagen, dass der Smote und Asn Smote sehr ähnlich sind und deswegen der Großteil der synthetischen Daten in den gleichen Bereichen entstehen.
 
 
 ## 3. Verwendete Classifier und Performancemaß
 ### 3.1 Verwendete Classifier
-Um für das Testdatenset Vorhersagen treffen zu können, müssen wir erst ein Modell aufstellen und dieses tunen. Hierbei entscheiden wir uns für die Machine Learning Modelle der Logistischen Regression und des Random Forest. Die Logistische Regression eignet sich beispielsweise gut für die Schätzung der Wahrscheinlichkeiten von binären oder kategorialen abhängigen Variablen. Der grundlegende Ansatz der logistischen Regression besteht darin, dass eine Sigmoid-Funktion auf eine lineare Kombination der Features angewendet wird. Die Sigmoid-Funktion transformiert den linearen Ausdruck in einen Wert zwischen 0 und 1, der als Wahrscheinlichkeit interpretiert werden kann. Zudem findet eine Regularisierung statt, welche mit dem Hyperparameter C festgelegt wird. Dieser ist auch der einzige zu tunende Parameter im Modell, wodurch eine Cross-Validation mit geringerem Rechenleistung durchgeführt werden kann. Jedoch könnte die vom Modell angenommene lineare Beziehung zwischen den Features einen Nachteil darstellen. Im Bezug auf den Random Forest ist zu wissen, dass er zu den Ensemble-Lernverfahren gehört und für Klassifikations- und Regressionsaufgaben verwendet wird. Er besteht aus einer Kombination von Entscheidungsbäumen, die unabhängig voneinander trainiert werden. Dabei wird jeder Baum auf einer zufälligen Stichprobe der Trainingsdaten trainiert und betrachtet auch nur eine zufällige Teilmenge der verfügbaren Features. Dies hilft dem Modell, um Overfitting zu vermeiden und gut verallgemeinern zu können. Bei einer Klassifikationsaufgabe ist die Vorhersage üblicherweise eine Mehrheitsentscheidung der Bäume. Die Vorteile dieser Methode sind, dass der Random Forest problemlos mit großen Datenmengen arbeiten kann und nicht dazu neigt die Trainingsdaten auswendig zu lernen. Zudem schneidet er in der Praxis oft besser ab als andere Classifier. Beim Tuning sind jedoch deutlich mehr Hyperparameter zu optimieren, wodurch ein großer Rechenaufwand notwendig ist und das Modell ist meist schwieriger zu interpretieren als einfachere Verfahren, wie z.B. die Logistische Regression.
+Um für das Testdatenset Vorhersagen treffen zu können, müssen wir erst ein Modell aufstellen und dieses tunen. Hierbei entscheiden wir uns für die Machine Learning Modelle der Logistischen Regression und des XGBoost. Die Logistische Regression eignet sich beispielsweise gut für die Schätzung der Wahrscheinlichkeiten von binären oder kategorialen abhängigen Variablen. Der grundlegende Ansatz der logistischen Regression besteht darin, dass eine Sigmoid-Funktion auf eine lineare Kombination der Features angewendet wird. Die Sigmoid-Funktion transformiert den linearen Ausdruck in einen Wert zwischen 0 und 1, der als Wahrscheinlichkeit interpretiert werden kann. 
+
+
+Bei der logistischen Regression haben wir nicht das in mlr implementierte Model gewählt, da wir um eine bessere Performance zu erzielen die Regularisierung tunen wollten. Dafür haben wir das Model von glmnet bzw. Tidymodels gefunden, welches dies ermöglicht. Die zu tunenden Hyperparameter sind Penalty und mixture, die die Art der Regularisierung (Lasso, Ridge, elastic Net, keine Regularisierung), sowie die Stärke der Regularisierung des elastic Net bestimmen. 
+Durch die geringere Anzahl an Hyperparametern konnte eine Cross-Validation mit geringerer Rechenleistung durchgeführt werden kann.
+
+
+Im Bezug auf den XGBoost ist zu wissen, dass er zu den Ensemble-Lernverfahren gehört und für Klassifikations- und Regressionsaufgaben verwendet wird. XGBoost ist eine Methode des Gradient Boosting, bei der Entscheidungsbäume nacheinander trainiert und kombiniert werden, um das Modell schrittweise zu verbessern.So werden die Entscheidungsbäume nicht unabhängig voneinander trainiert sondern basieren auf den Vorhersagen der vorherigen Modelle. Jeder Baum wird so konstruiert, dass er die Fehler des vorherigen Baumes reduziert. Dieser iterative Prozess führt zu einer schrittweisen Verbesserung des Modells, indem die Schwachpunkte des vorherigen Baumes gezielt adressiert werden. Bei einer Klassifikationsaufgabe in XGBoost wird die Vorhersage durch eine Mehrheitsentscheidung der einzelnen Bäume getroffen. Jeder Baum gibt eine Wahrscheinlichkeit für jede Klasse aus, und die endgültige Vorhersage wird durch die Kombination dieser Wahrscheinlichkeiten bestimmt.
+
+
+
+
+Die Vorteile des XGBoost sind dass er in der Praxis oft besser abschneidet als andere Classifier. Beim Tuning sind jedoch deutlich mehr Hyperparameter zu optimieren, wodurch ein großer Rechenaufwand notwendig ist und das Modell ist meist schwieriger zu interpretieren als einfachere Verfahren, wie z.B. die Logistische Regression.
+Aufgrund der Größe des Datensatzes und der noch höheren Laufzeiten bei einer höheren Anzahl von Hyperparametern, haben wir uns in diesem Fall dazu entschieden, statt der Vielzahl an möglichen Hyperparametern, den Klassifier mit nur zwei Hyperparametern zu trainieren, da es die Laufzeit stark reduziert. Dabei haben wir "nrounds", die Anzahl an sequenziell zu trainierenden Bäumen und "eta", die Lernrate, die ein overfitting vermeiden soll als wichtigste Hyperparameter ausgemacht. Die kleinere Anzahl an Hyperparameter hat im Vergleich zum “kompletten” Model keine signifikanten Unterschiede in der Performance (AUC) ergeben, weshalb wir damit weiter gearbeitet haben.
+
+
 
 
 ```{r Logistische Regression}
@@ -327,7 +343,7 @@ log_regression <- function(train) {
     log_reg_final <- logistic_reg(penalty = best_penalty, mixture = best_mixture) %>%
       set_engine("glmnet") %>%
       set_mode("classification") %>%
-      fit(Class~., data = training)
+      fit(Class~., data = train)
     
     # Evaluate the model performance on the test set
     pred_class <- predict(log_reg_final,
@@ -355,14 +371,14 @@ xgboost <- function(train) {
     # Define the parameter set
     params <- makeParamSet(
           makeIntegerParam("nrounds", lower = 100, upper = 500),
-          makeNumericParam("eta", lower = 0.05, upper = 0.3)
+          makeNumericParam("eta", lower = 0.05, upper = 0.3)  
           )
     
     # Set the control for tuning
-    ctrl <- makeTuneControlGrid()
+    ctrl <- makeTuneControlRandom(maxit=1L)
     
     # Set resampling strategy
-    rdesc <- makeResampleDesc("CV", iters = 5L)
+    rdesc <- makeResampleDesc("CV", iters = 5L) 
     
     # Tune the hyperparameters
     tune_result <- tuneParams(learner, task = classif_task, resampling = rdesc, par.set = params, control = ctrl)
@@ -383,6 +399,7 @@ xgboost <- function(train) {
 ```
 
 ```{r Train the Classifiers on Smote and on the ASN Smote}
+parallelStartSocket(detectCores())
 
 pred_log_reg_smote <- log_regression(train_smote)
 pred_xgboost_smote <- xgboost(train_smote)
@@ -395,13 +412,15 @@ pred_xgboost_asn_smote <- xgboost(train_asn_smote)
 
 
 ### 3.2 Performancemaß
-Die Leistung der Algorithmen des maschinellen Lernens wird in der Regel anhand einer Konfusionsmatrix bewertet und die Vorhersagegenauigkeit definiert als Accuracy = (T P + T N)/(T P + F P + T N + F N). Dabei ist die Fahlerrate 1 – Accuracy. Dies gilt jedoch nur im Zusammenhang mit ausgeglichenen Datensätzen und gleichen Fehlerkosten. Denn beim betrachteten Datensatz würde sogar ein Modell, welches immer die Majority prognostiziert, eine Accuracy von über 99% erreichen. Daher verwenden wir beim Creditdata Datensatz mit ungleichen Fehlerkosten, die Receiver Operating Characteristic Curve (ROC-Curve) und die Area under the Curve (AUC), um die Performance der Logistischen Regression und des Random Forests zu bestimmen. Hierbei wird auf der X-Achse die False-Positive-Rate %F P = F P/(T N+F P) und auf der Y-Achse die True-Positive-Rate %T P = T P/(T P +F N) dargestellt. Der ideale Punkt auf der ROC-Kurve wäre (0,100), d. h. alle positiven Samples werden richtig klassifiziert und keine negativen Beispiele werden falsch als positiv klassifiziert. Die Linie y = x stellt das Szenario einer zufälligen Schätzung der Klasse dar. Zudem ist die Fläche unter der ROC Kurve (AUC) ein nützliches Maß für die Leistung des Klassifikators, da es unabhängig vom gewählten Entscheidungskriterium und den vorherigen Wahrscheinlichkeiten ist.
+Die Leistung der Algorithmen des maschinellen Lernens wird in der Regel anhand einer Konfusionsmatrix bewertet und die Vorhersagegenauigkeit definiert als Accuracy = (T P + T N)/(T P + F P + T N + F N). Dabei ist die Fahlerrate 1 – Accuracy. Dies gilt jedoch nur im Zusammenhang mit ausgeglichenen Datensätzen und gleichen Fehlerkosten. Denn beim betrachteten Datensatz würde sogar ein Modell, welches immer die Majority prognostiziert, eine Accuracy von über 99% erreichen. Daher verwenden wir beim Creditdata Datensatz mit ungleichen Fehlerkosten, die Receiver Operating Characteristic Curve (ROC-Curve) und die Area under the Curve (AUC), um die Performance der Logistischen Regression und des Random Forests zu bestimmen. Hierbei wird auf der X-Achse die False-Positive-Rate (Specificity) %F P = F P/(T N+F P) und auf der Y-Achse die True-Positive-Rate (Sensitivity) %T P = T P/(T P +F N) dargestellt. Der ideale Punkt auf der ROC-Kurve wäre (0,100), d. h. alle positiven Samples werden richtig klassifiziert und keine negativen Beispiele werden falsch als positiv klassifiziert. Die Linie y = x stellt das Szenario einer zufälligen Schätzung der Klasse dar. Zudem ist die Fläche unter der ROC Kurve (AUC) ein nützliches Maß für die Leistung des Klassifikators, da es unabhängig vom gewählten Entscheidungskriterium und den vorherigen Wahrscheinlichkeiten ist.
 
 ```{r Performance Function}
 performance <- function(title, pred) {
   
   pred <- as.factor(pred)
   test$Class <- as.factor(test$Class)
+  
+  # auc score
   auc <- roc(test$Class, as.numeric(pred))
 
   truth_predicted <- data.frame(
@@ -412,6 +431,7 @@ performance <- function(title, pred) {
   levels(truth_predicted$obs) <- c("not_Fraud", "Fraud")
   levels(truth_predicted$pred) <- c("not_Fraud", "Fraud")
   
+  # confusion matrix
   cm <- conf_mat(truth_predicted, obs, pred)
   
   TP <- cm$table[2, 2]
@@ -434,7 +454,7 @@ performance <- function(title, pred) {
 
   
   
-  return(list(AUC = auc_plot, Confusion_Matrix = cm_plot, Sensitivity = sensitivity, Specificity = specificity))
+  return(list(Confusion_Matrix = cm_plot, Sensitivity = sensitivity, Specificity = specificity))
 }
 
 ```
@@ -442,46 +462,67 @@ performance <- function(title, pred) {
 
 ## Performance Logistic Regression mit SMOTE
 ```{r}
-performance("Logistische Regression mit SMOTE", pred_log_reg_smote)
+title1 <- "Logistische Regression mit SMOTE"
+performance(title1, pred_log_reg_smote)
 ```
 ## Peformance XGBoost mit SMOTE
 ```{r}
-performance("XGBoost mit SMOTE", pred_xgboost_smote)
+title2 <- "XGBoost mit SMOTE"
+
+performance(title2, pred_xgboost_smote)
 ```
 
 ## Peformance Logistische Regression mit ASN SMOTE
 ```{r}
-performance("Logistische Regression mit ASN SMOTE", pred_log_reg_asn_smote)
+title3 <- "Logistische Regression mit ASN SMOTE"
+performance(title3, pred_log_reg_asn_smote)
 ```
 
 ## Peformance XGBoost mit ASN SMOTE
 ```{r}
-performance("XGBoost mit ASN SMOTE", pred_xgboost_asn_smote)
+title4 <- "XGBoost mit ASN SMOTE"
+performance(title4, pred_xgboost_asn_smote)
 ```
 
+Beim Vergleich der Performance zwischen den Classifiern (logistische Regression und XGBoost) und den verwendeten SMOTE-Alternativen (SMOTE und ASN SMOTE) lassen sich einige interessante Ergebnisse feststellen. Zunächst zeigt sich, dass der ASN SMOTE in Bezug auf den AUC-Wert, der besonders aussagekräftig für unausgewogene Datensätze ist, bei beiden Classifiern und beim ASN SMOTE schlechter abschneidet als der SMOTE. Hier wird der AUC Wert individuell betrachtet, später wird jedoch auch geschaut wie der AUC im Durchschnitt bei über 600 Iterationen abschneidet.
+
+Um eine detailliertere Fehleranalyse durchzuführen, wurde zusätzlich die Confusion Matrix betrachtet, die Aufschluss darüber gibt, wo die Fehler aufgetreten sind.
+Hierbei wird deutlich, dass sowohl der SMOTE als auch der ASN SMOTE ihre Stärken und Schwächen haben. Der SMOTE zeigt in diesem Datensatz eine bessere True Positive Rate im Vergleich zum ASN SMOTE, während er bei der Erkennung von True Negatives schlechter abschneidet und der ASN SMOTE, fast 100% (bei XGBoost) der nicht betrügerischen Transaktionen richtig erkennt.
+
+Um eine Bewertung geben, welcher Algorithmus besser geeignet ist, muss abgewogen werden, welche Rate ökonomisch relevanter ist. Da betrügerische Aktivitäten auf den ersten Blick einen höheren wirtschaftlichen Schaden verursachen, als fälschlicherweise als Betrug erkannte, wird die Erkennung des Betrugs als wichtiger eingeschätzt. 
+Allerdings ist die korrekte Erkennung der nicht betrügerischen Transaktionen auch nicht unwichtig. Denn eine Falsche Klassifizierung dieser Fälle würde bedeuten, dass Transaktionen verzögert werden würden und von einem Mitarbeiter überprüft werden müssten. Das würde wirtschaftlichen Schaden durch die Benötigung weiterer Mitarbeiter bedeuten und zusätzlich ein "Imageschaden" zu folge haben, da die Kunden möglicherweise über die verzögerten Transaktionen verärgert sein könnten.
+
+Zusammenfassend lässt sich sagen, dass beide Fehlerfälle vermieden werden sollten. Es konnte jedoch nicht abschließend geklärt werden, welcher der beiden Fehlerfälle dem Unternehmen mehr Schaden zufügen würde.
+
+Beim Vergleich der Classifier zeigt sich, dass die logistische Regression in diesem Fall im SMOTE deutlich besser abschneidet als der XGBoost, jedoch im ASN-SMOTE, der XGBoost stärker performt. Auch interessant ist, dass der XGBoost im Vergleich der confusion matrix, bei der Specificity einen stärkeren Wert aufweist als die logitische regression. Später soll nochmal betrachtet werden wie die Classifier über mehrere Iterationen hinweg, im Hinblick auf den AUC abschneiden.
 
 ```{r Wo wurden die Fehler gemacht?}
 ggplot(train_smote, aes(x = V1, y = V2)) +
   geom_point(data = train_smote[train_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
   geom_point(data = train_smote[train_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
-  geom_point(data = test[pred_xgboost_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
+  geom_point(data = test[pred_log_reg_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
   ggtitle("FALSE NEGATIVE bei XGBoost mit SMOTE") +
-  xlim(-6, 3) + 
-  ylim(-3, 5) 
+  xlim(-4, 3) + 
+  ylim(-4, 4)
 
 ggplot(train_asn_smote, aes(x = V1, y = V2)) +
   geom_point(data = train_asn_smote[train_asn_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
   geom_point(data = train_asn_smote[train_asn_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
-  geom_point(data = test[pred_xgboost_asn_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
+  geom_point(data = test[pred_log_reg_asn_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
   ggtitle("FALSE NEGATIVE bei XGBoost mit ASN SMOTE") +
-  xlim(-6, 3) + 
-  ylim(-3, 5) 
+  xlim(-4, 3) + 
+  ylim(-4, 4) 
 
 
 ```
 
 ## Interpretation der Ergebnisse
-Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler (False Negative --> als nicht_fraud prognostiziert aber in Wahrheit Fraud) beim ASN Smote lagen (hier nur 2 dimensional), sieht man dass die Fehler in den selben Bereichen liegen. Der Unterschied liegt darin, dass bei der Anwendung des ASN Smotes, etwas mehr False negative entstanden sind (auch an der confusion matrix zu erkennen) 
+Nun stellt sich die Frage, warum die TNR beim ASN SMOTE höher ist als beim SMOTE. Hierfür wurden im oben abgebildeten Plot die False Negative Fehler für SMOTE sowie für ASN SMOTE aufgezeigt, die die logistische Regression gemacht hat.
+
+Wie bereits erwähnt, funktionieren SMOTE und ASN SMOTE sehr ähnlich und unterscheiden sich nur in den qualifizierten Daten der Minority-Klasse. Daher ist es nicht überraschend, dass bei der genaueren Betrachtung auffällt, dass die meisten (FN) Fehler in den gleichen Bereichen liegen. Der Unterschied besteht darin, dass beim ASN SMOTE zusätzliche False Negatives in den Punkten: ((-2,-1);(-0.5,1.5);(1,2);(1.2,1.2)) entstehen. In dem Bereich schiebt der ASN SMOTE Daten der minority Klasse in den "unqualifizierten" Datensatz, während der Smote dort synthetische Daten kreiert. Eine  mögliche Erklärung dafür ist es dass die minority Datenpunkte, sich in diesem Bereich stark mit der majority Klasse durchmischen.
+Dadurch dass der SMOTE auch in Bereichen synthetische Daten kreiert, in denen die Daten der minority Klasse stark verteilt sind und sich mit den Punkten der majority Klassen überschneiden, ist auch der Fehler bei den FP höher als beim ASN SMOTE, was es für den Classifier schwieriger macht, die Majority richtig als Majority zu erkennen. 
+
+Letztendlich kann gesagt werden, dass vermutlich eine Mischung der beiden Algorithmen am besten geeignet wäre, um möglichst viele betrügerische Transaktionen richtig zu erkennen, ohne die TNR aus den Augen zu verlieren. 
 
 
 
@@ -694,6 +735,8 @@ Hyperp....
 ```{r Performance des ASN-SMOTE}
 #Code
 ```
+Allerdings erreicht der XGBoost bei maximaler AUC einen höheren Wert als die logistische Regression. Dies bedeutet, dass der XGBoost bei optimalen Hyperparametern besser für die Klassifikation geeignet ist. Die Unterschiede in der AUC zwischen den Classifiern sind jedoch sehr gering, so dass die Wahl des Classifiers letztendlich keine große Auswirkung hat und der Fokus eher auf der Optimierung des Oversamplings/ Undersampling liegen sollte.
+
 
 ## 8. Undersampling vor ASN-SMOTE
 ```{r Undersampling vor ASN-SMOTE}
