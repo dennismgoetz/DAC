@@ -1097,9 +1097,44 @@ for (i in 1:number_of_runs){
 
 ### 4.5 Ergebnisse der Performance
 ```{r Performance des ASN-SMOTE}
-#Code
+# Read Excel
+testedHyperparameters <- read_excel("hyperparameter_tuning_v2.xlsx")
+
+logistic_smote_subset <- subset(testedHyperparameters, classifier == "logistic_regression" & oversampling_altorithm == "smote")
+logistic_asn_smote_subset <- subset(testedHyperparameters, classifier == "logistic_regression" & oversampling_altorithm == "asn")
+xgboost_smote_subset <- subset(testedHyperparameters, classifier == "xgboost" & oversampling_altorithm == "smote")
+xgboost_asn_smote_subset <- subset(testedHyperparameters, classifier == "xgboost" & oversampling_altorithm == "asn")
+
+# Calculate Average AUC, number Iterations per Classifier, maximum AUC reached
+xgboost_smote_avg <- mean(xgboost_smote_subset$AUCAverage)
+xgboost_asn_avg <- mean(xgboost_asn_smote_subset$AUCAverage)
+
+xgboost_smote_count <- nrow(xgboost_smote_subset)
+xgboost_asn_count <- nrow(xgboost_asn_smote_subset)
+
+xgboost_smote_max <- max(xgboost_smote_subset$AUCAverage)
+xgboost_asn_max <- max(xgboost_asn_smote_subset$AUCAverage)
+
+logistic_smote_avg <- mean(logistic_smote_subset$AUCAverage)
+logistic_asn_avg <- mean(logistic_asn_smote_subset$AUCAverage)
+
+logistic_smote_count <- nrow(logistic_smote_subset)
+logistic_asn_count <- nrow(logistic_asn_smote_subset)
+
+logistic_smote_max <- max(logistic_smote_subset$AUCAverage)
+logistic_asn_max <- max(logistic_asn_smote_subset$AUCAverage)
+
+result_df <- data.frame(
+  Classifier = c("XGBoost (SMOTE)", "XGBoost (ASN SMOTE)", "Logistic Regression (SMOTE)", "Logistic Regression (ASN SMOTE)"),
+  Iterations = c(xgboost_smote_count, xgboost_asn_count, logistic_smote_count, logistic_asn_count),
+  Average_AUC = c(xgboost_smote_avg, xgboost_asn_avg, logistic_smote_avg, logistic_asn_avg),
+  Maximum_AUC = c(xgboost_smote_max, xgboost_asn_max, logistic_smote_max, logistic_asn_max)
+)
+
+result_df
 ```
-Allerdings erreicht der XGBoost bei maximaler AUC einen höheren Wert als die logistische Regression. Dies bedeutet, dass der XGBoost bei optimalen Hyperparametern besser für die Klassifikation geeignet ist. Die Unterschiede in der AUC zwischen den Classifiern sind jedoch sehr gering, so dass die Wahl des Classifiers letztendlich keine große Auswirkung hat und der Fokus eher auf der Optimierung des Oversamplings/ Undersampling liegen sollte.
+
+Beide Modelle (XGBoost / logistische Regression) haben ähnliche durchschnittliche AUC-Werte erzielt, wobei die Logistische-Regression immer etwas besser abschneidet. Der SMOTE zeigt im Allgemeinen bessere Leistungen als der ASN SMOTE, obwohl die Unterschiede nicht signifikant sind. Der maximale AUC-Wert gibt an, wie gut das Modell in der besten Iteration abgeschnitten hat. Allerdings erreicht der XGBoost bem maximalen AUC einen höheren Wert als die logistische Regression. Dies bedeutet, dass der XGBoost bei optimalen Hyperparameternbesser für die Klassifikation geeignet ist. Die Unterschiede in der AUC zwischen den Classifiern sind jedoch sehr gering, so dass die Wahl des Classifiers letztendlich keinegroße Auswirkung hat und der Fokus eher auf der Optimierung des Oversamplings/ Undersamplingliegen sollte.
 
 
 
