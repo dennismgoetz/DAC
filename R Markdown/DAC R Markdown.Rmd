@@ -35,7 +35,7 @@ Philipp von Lovenberg, Vincent Bläske, Dennis Götz
 4.	Programmablauf mit Cross-Validation und Hyperparameteroptimierung  
     4.1.	Undersampling  
     4.2.	Cross-Validation  
-    4.3.	Hyperparameteroptimierung  
+    4.3.	Hyperparameteroptimierung von SMOTE/ASN und Undersampling    
     4.4.  Skript  
     4.5.	Ergebnisse der Performance  
 5.	Ausblick  
@@ -151,7 +151,6 @@ Allerdings können unsachgemäß erzeugte Minority Samples das Lernen des Classi
 asn_smote <- function(train, n, k) {
 
   # Split the train set into features (X_train) (T in the Pseudo Code) and target value (y_train)
-
   
   # Create a matrix with the features and split the train set into majority and minority
   train_feat_matrix <- as.matrix(X_train)
@@ -496,6 +495,135 @@ Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler 
 
 
 ## 4. Programmablauf mit Cross-Validation und Hyperparameteroptimierung
+
+In Kapitel 3 wurden Funktionen für einzelne Durchläufe von SMOTE/ASN und den Classifiern definiert. In diesem Kapitel sollen diese in einer Weise neu kombiniert und erweitert werden, die es ermöglicht, diese Algorithmen in mehrere Durchläufe mit Cross-Validation und verschiedenen Hyperparameterkombinationen einzubinden. Dafür muss der oben eingeführte ASN-SMOTE Algorithmus angepasst werden.
+
+```{r Angepasstes ASN-SMOTE}
+
+
+##### ASN-SMOTE
+asn_smote <- function(train, K, dup_size) {
+  
+  train_feat <- train[,1:29] #Features of train  (= T in the Pseudo Code)
+  train_target <- train$Class #Target value of train
+  
+  
+  train_feat_matrix <- as.matrix(train_feat)
+  train_Majority <- train[train_target == 0,]
+  train_Minority <- train[train_target == 1,]
+  
+  ####### [1:29] muss man noch Ã¤ndern, sodass man Function fÃ¼r andere DatensÃ¤tze replizieren kann
+  train_Minority_feat <- train_Minority[,1:29]   #Features of Minority set (= P in the Pseudo code)
+  
+  # Algorithm 1: Noise filtering
+  dis_matrix <- proxy::dist(train_Minority_feat, train_feat)
+  
+  
+  ##########################################################################################################
+  
+  
+  index_knn <- list()
+  
+  # Tests
+  #dis_matrix[1,]
+  #order(dis_matrix[1,])
+  #order(dis_matrix[1,])[1:6]
+  #dis_matrix[1, 490]
+  #dis_matrix[1, 71985]
+  #dis_matrix[1, 24231]
+  
+  #train[490,]
+  #train_Minority_feat[1,]
+  
+  #sum(train_Minority_feat[1,] - train_feat[490,]) #sollte 0 sein (passt)
+  #sum(train_Minority_feat[1,] - train_feat[24977,]) #sollte 4.352906 sein (passt nicht)
+  #sum(abs(train_Minority_feat[1,] - train_feat[24977,]))
+  #rownames(dis_matrix)[1]
+  
+  
+  for (i in 1:nrow(train_Minority_feat)) {
+    index_knn[[rownames(dis_matrix)[i]]] <- order(dis_matrix[i,])[2:(K+1)]
+    for (j in 1:K) {
+      if (train_target[index_knn[[i]][j]] == 0 ) {
+        index_knn[[i]][j] <- NaN
+      }
+    }
+  }
+  
+  
+  Mu <- vector()
+  for (i in length(index_knn):1) { 
+    if (is.nan(index_knn[[i]][1])) {
+      Mu[i] <- names(index_knn[i])
+      index_knn <- index_knn[-i]
+    }
+  }
+  
+  Mu <- na.omit(Mu)
+  Mu <- Mu[1:length(Mu)]
+  
+  # Variante Dennis
+  for (i in 1:length(index_knn)) {
+    for (j in 1:K) {
+      if (is.nan(index_knn[[i]][j])) {
+        index_knn[[i]] <- index_knn[[i]][1:(j-1)]
+        break
+      }
+    }
+  }
+  
+  
+  
+  # Check for duplicates in each list of qualified neighbors
+  #  # Create a duplicate
+  #  index_knn['258404']
+  #  index_knn[['258404']][2] <- index_knn[['258404']][1]
+  #  index_knn['258404']
+  
+  
+  #  duplicates_list <- list()
+  #  for (i in 1:length(index_knn)) {
+  
+  #    duplicates <- duplicated(index_knn[[i]])
+  
+  #    if (any(duplicates)) {
+  #      duplicates_list[[i]] <- index_knn[[i]][duplicates]
+  #    }
+  #  }
+  #  duplicates_list
+  
+  synthetic <- list()
+  for(i in names(index_knn)) {
+    for(j in seq_len(dup_size)) {
+      random_n <- sample(seq_along(index_knn[[i]]), 1)   # random number in the length of the best index
+      dif <- train_feat_matrix[index_knn[[i]][random_n],] - train_feat_matrix[i,]  ## dif von der dis matrix
+      randomNum <- runif(1)
+      synthetic_instance <- train_feat_matrix[i,] + randomNum * dif
+      synthetic[[length(synthetic) + 1]] <- synthetic_instance
+    }
+  }
+  
+  
+  ###########################################################################################################
+  
+  # assign "Class" label = 1 to the synthtic points
+  synthetic_df <- do.call(rbind, synthetic)
+  synthetic_df <- as.data.frame(synthetic_df)
+  synthetic_labels <- rep(1, length(synthetic))
+  synthetic_df$Class <- synthetic_labels
+  
+  # Combine original train set with synthetic set
+  asn_train <- rbind(train, synthetic_df)
+  
+  # remove unqualified points of minority class
+  #asn_train <<- asn_train[!(rownames(asn_train) %in% Mu), ] #warum löschen?
+  
+  return(asn_train)
+}
+
+
+```
+
 ### 4.1 Undersampling
 
 Der vorliegende Datensatz ist mit seinem Verhältnis zwischen Majority Class und Minority Class von ca. 578:1 deutlich stärker imbalanced als die Datensätze, mit denen ASN-SMOTE im dazugehörigen Paper getestet wurde (1,82 - 41,4). Deshalb und aufgrund der herausfordernden langen Laufzeiten wurde sich dafür entschieden, die majority class zu undersamplen. Dafür wurde eine Funktion für random undersampling implementiert, welcher nur samples der majority class entfernt.
@@ -504,7 +632,7 @@ Der vorliegende Datensatz ist mit seinem Verhältnis zwischen Majority Class und
 ```{r Undersampling}
 
 # Input: undersamplingFaktor (0 = kein Undersampling, 0.99 = Um 99 %, also 1% der urspr. Anzahl), Trainingsdatensatz
-undersample <- function (undersamplingFactor = 0.99, dataset = ccdata){
+undersample <- function (undersamplingFactor = 1.00, dataset = ccdata){
   # TRUE im SelectionVector heißt weiter benutzen, FALSE heißt verwerfen
   selectionVector <- dataset$Class==1
   selectionVector <- as.logical(
@@ -521,6 +649,8 @@ undersample <- function (undersamplingFactor = 0.99, dataset = ccdata){
 
 ```
 
+Beispiel mit 99% undersampling:
+
 ```{r Undersampling Example}
 
 cat("Vor Undersampling: \n")
@@ -536,7 +666,9 @@ cat("\n","undersampling um ", round((1-(table(undersampled_data$Class)[1]/table(
 
 Dabei wird mit der Sample Funktion gearbeitet, wodurch das tatsächliche Verhältnis minimal abweichen kann. Nach ersten Tests mit dem Undersampling, SMOTE und XGBoost wurde davon ausgegangen, dass selbst starkes Undersampling keinen negativen Einfluss auf die Performance haben würde. 
 
-```{r impact of undersampling rate on performance, echo=FALSE}
+Das ist im folgenden Diagramm zu sehen. Hier wurde die Performance von SMOTE + XGBoost in Abhängigkeit von der undersampling Rate dargestellt. 
+
+```{r impact of undersampling rate on performance}
 hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_v1.csv")[-1:-3]
 
 plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
@@ -546,7 +678,6 @@ plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
 ))[,c(2,5)])
 
 ```
-
 
 Bei der Verwendung von ASN-SMOTE mit Undersampling ist zu beachten, dass es einen Unterschied macht, ob zuerst der Undersampling oder der ASN-Algorithmus ausgeführt wird. Das liegt daran, dass beim ASN-SMOTE (anders als bei normalem SMOTE) auch die majority class samples berücksichtigt werden (qualified vs. unqualified minority samples). Im weiteren Vorgehen wurde sich dafür entschieden, ASN-SMOTE so anzuwenden, das hier alle majority class samples berücksichtigt werden sollen und das ASN-SMOTE dementsprechend auf den nicht undersampleten Datensatz angewendet wird. 
 
@@ -567,7 +698,7 @@ Bei der Implementierung müssen zunächst Funktionen zum Teilen des Datensatzes 
 # Input: Anzahl in wie viele subsets geteilt werden soll, Datensatz
 splitIntoKSubsets <- function(K = 4, dataset = ccdata){
   subsets <- list()
-  # split von 1-k
+  # split von 1-5
   split <- sample(1:K, size = length(dataset[,1]), replace = TRUE)
   for (i in 1:K){
     subsets <- append(subsets, list(subset(dataset, split == i)))
@@ -602,6 +733,8 @@ Beim ASN-SMOTE ist hier auch zu sehen, dass der ASN-SMOTE auf den nicht-undersam
 
 ```{r Funktionen zum Aufrufen der Algorithmus Kombinationen}
 
+
+# Input: Hyperparameter von SMOTE, Train und Testdatensatz
 run_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   
   # Perform SMOTE
@@ -653,8 +786,12 @@ run_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   
   # Calculate AUC
   roc_obj <- performance(test_pred, measures = mlr::auc)
-
+  #print(roc_obj)
+  ######      auc 
+  ######   0.9765212
+  
   auc <- roc(test$Class, as.numeric(test_pred$data$response))
+  #plot(auc, main = paste0("AUC= ", round(pROC::auc(auc),4)), col = "blue")
   
   
   ## Generate confusion matrix
@@ -663,6 +800,7 @@ run_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577, train, test){
   test_pred$data$truth <- as.factor(test_pred$data$truth)
   
   cm = confusionMatrix(data = test_pred$data$response, reference = test_pred$data$truth)
+  #print(cm)
   
   return(list(
     "ROC" = roc_obj, 
@@ -678,10 +816,17 @@ run_asn_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577,  train_undersa
   # Perform SMOTE
   set.seed(1234)
   # ASN mit nicht undersampled trainingsdatensatz
-  asn_train <- asn_smote(train_not_undersampled, k = kSMOTE, n = nSMOTE)
-
+  asn_train <- asn_smote(train_not_undersampled, K = kSMOTE, dup_size = nSMOTE)
+  # print("asn_train")
+  # print(table(asn_train$Class))
+  
+  # print("train_undersampled")
+  # print(table(train_undersampled$Class))
+  
   # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz
   training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])
+  # print("training")
+  # print(table(training$Class))
   
   training$Class <- as.factor(training$Class)
   
@@ -729,8 +874,12 @@ run_asn_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577,  train_undersa
   
   # Calculate AUC
   roc_obj <- performance(test_pred, measures = mlr::auc)
+  #print(roc_obj)
+  ######      auc 
+  ######   0.9765212
   
   auc <- roc(test$Class, as.numeric(test_pred$data$response))
+  #plot(auc, main = paste0("AUC= ", round(pROC::auc(auc),4)), col = "blue")
   
   
   ## Generate confusion matrix
@@ -829,12 +978,17 @@ run_asn_smote_with_logistic_regression <- function (kSMOTE = 5, nSMOTE = 577,  t
   # Perform SMOTE	
   set.seed(1234)	
   # ASN mit nicht undersampled trainingsdatensatz	
-  asn_train <- asn_smote(train_not_undersampled, k = kSMOTE, n = nSMOTE)
-
+  asn_train <- asn_smote(train_not_undersampled, K = kSMOTE, dup_size = nSMOTE)	
+  # print("asn_train")	
+  # print(table(asn_train$Class))	
+  
+  # print("train_undersampled")	
   # print(table(train_undersampled$Class))	
   
   # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz	
   training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])	
+  # print("training")	
+  # print(table(training$Class))	
   
   training$Class <- as.factor(training$Class)
   
@@ -901,6 +1055,7 @@ run_asn_smote_with_logistic_regression <- function (kSMOTE = 5, nSMOTE = 577,  t
 # Output: List mit auc, roc und confusion matrix
 
 
+
 ```
 
 
@@ -911,6 +1066,7 @@ Bei der Betrachtung der Implementierung der Funktion "splitIntoKSubsets" fällt 
 
 ```{r Cross-Validation}
 
+
 # Input: gewünschte Algorithmen, Anzahl der gewünschten Subsets für Crossvalidation, Datensatz, Parameter für SMOTE
 kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, entireDataset, undersampling_factor, kForSMOTE, nDesiredRatioOfClassesForSMOTE){
   subsets <- splitIntoKSubsets(K = kForFold, dataset = entireDataset)
@@ -918,10 +1074,23 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
   for (i in 1:length(subsets)){
     inputDataForModelRun <- mergeSubsetsIntoTrainAndTest(whichSubsetAsTest = i, subsetList = subsets)
     
+    # UNDERSAMPLING : 
+    #print(undersampling_factor)
+    #print(table(inputDataForModelRun$train$Class))
     undersampled_train <- undersample(undersampling_factor, inputDataForModelRun$train)
+    #print(table(inputDataForModelRun$train$Class))
     
     
-    # Bestimmung n:
+    
+    # da in jedem subset ein leicht anderes anderes Verhältnis von min zu maj
+    # klasse vorliegt, sollte der N parameter für jedes subset bestimmt werden.
+    # nDesiredRatioOfClassesForSMOTE von 100% (= 1) bedeutet dabei, 
+    # dass nach SMOTE gleich viele minority wie 
+    # majority samples im Datensatz sein sollen (100% bedeutet also gleich viele,
+    # das sollte wieder einen absoluten n Wert von ca. 577 ergeben)
+    # Das Hyperparametertuning erfolgt somit später mit prozentwerten statt
+    # absoluten werten. z.B. 120% (=1.2) würde also bedeuten, wir wollen
+    # 20% mehr minority als majority samples nach SMOTE
     nAbsoluteSMOTE <- table(undersampled_train$Class)[1]/table(undersampled_train$Class)[2]
     nAbsoluteSMOTE <- round((nAbsoluteSMOTE-1)*nDesiredRatioOfClassesForSMOTE)
     
@@ -937,6 +1106,7 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
         cat("run_asn_smote_with_xgboost - with N = ",nAbsoluteSMOTE)
         resultsOfSingleRun <- run_asn_smote_with_xgboost(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE,  train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
       }
+      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     }
     else if (classifier == "logistic_regression"){
       if (oversampling_algorithm == "smote"){
@@ -947,7 +1117,9 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
         cat("run_asn_smote_with_logistic_regression - with N = ",nAbsoluteSMOTE)
         resultsOfSingleRun <- run_asn_smote_with_logistic_regression(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE, train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
       }
+      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     }
+    else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     
     
     vectorOfAOCresults <- c(vectorOfAOCresults, resultsOfSingleRun$AUC)
@@ -962,26 +1134,49 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
 }
 # Output: verwendete Algorithmen, List mit Durchschnitts-AUC, Vektor der AUCs der einzelnen Durchläufe und dem verwendeten Classifier und oversampling algorithmus
 
+
 ```
 
-### 4.3 Hyperparameteroptimierung  
+### 4.3 Hyperparameteroptimierung von SMOTE/ASN und Undersampling  
 
-zu N: In ersten Tests mit SMOTE und XGBoost kaum Einfluss auf die Performance
-(außer Extremwerte die so niedrig sind das de facto nicht mehr gesmotet wird -> dann nähert sich performance an die Performance ohne SMOTE an). Daher entscheidung nratiosmote nicht zu optimieren, das Verhältnis im Datensatz nach SMOTE/ASN soll also immer 1:1 sein. 
+Nachdem die Hyperparameteroptimierung der Classifier bereits implementiert ist (siehe Classifier Implementierungen), fehlt nun noch ein Optimieren der Hyperparameter von SMOTE/ASN und der undersampling Rate. Dabei wurde ein Random Search implementiert, welcher innerhalb definierter Bereiche Hyperparameterkombinationen testet und die kreuzvalidierte Performance speichert. So mehr Hyperparameter optimiert werden sollen und so größer die Bereiche dafür sind, desto mehr Durchläufe werden benötigt, um zuverlässige Aussagen über optimale Parameter und deren Einfluss auf die Performance treffen zu können.
+
+Dafür wurde in ersten Tests mit SMOTE und XGBoost eingegrenzt, welche Bereiche für die verschiedenen Hyperparameter gesetzt werden. Dabei wurde unterstellt, dass auch das Verwenden von ASN-SMOTE oder logistischer Regression die Bereiche, in denen sinnvoll nach Parametern gesucht werden soll, nicht deutlich ändern im Vergleich zu normalem SMOTE und XGBoost.
+
+In diesen ersten Tests mit SMOTE und XGBoost hatte n, bzw. das genaue Verhältnis zwischen Minority und Majority class nach SMOTE, kaum Einfluss auf die Performance. Eine Ausnahme stellen hier lediglich Werte für n dar, die so niedrig sind, dass de facto kaum noch synthetische Samples erstellt werden. Die Performance nähert sich bei so niedrigen Werten erwartungsgemäß der Performance ohne SMOTE an. 
+
 
 ```{r impact of n on performance, echo=FALSE}
-hyperparameter_tuning_results_legacy_v1 <- read.csv("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace/hyperparameter_tuning_V1.csv")[-1:-3]
+hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_V1.csv")[-1:-3]
 
 plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
-  hyperparameter_tuning_results_legacy_v1$undersamplingFactor == 0) * 
-    (hyperparameter_tuning_results_legacy_v1$kSMOTE < 100) * 
+  hyperparameter_tuning_results_legacy_v1$undersamplingFactor < 0.1) * 
+    (hyperparameter_tuning_results_legacy_v1$kSMOTE < 50) * 
     (hyperparameter_tuning_results_legacy_v1$kFold==4)
 ))[,c(4,5)])
 
 ```
+Theoretisch könnte es hier auch Unterschiede nach Classifier geben, da verschiedene Classifier unterschiedlich gut mit imbalanced Datasets umgehen können. Allerdings ergab sich hier kein Grund zur Annahme, dass ein abweichendes Verhältnis das Verhältnis von 1:1 erheblich übertreffen könnte. Ressourcen in das Tuning von n zu stecken, erschien daher nicht sinnvoll. Deshalb wurde beschlossen, n immer so zu setzen, dass das Verhältnis im Datensatz nach SMOTE/ASN 1:1 ist. Dieser Hyperparameter wurde also im weiteren nicht getunt. 
 
-Hyperp....
+Diese Betrachtung mit SMOTE und XGBoost wurde mit dem Parameter k von SMOTE fortgesetzt. Hier ergebt sich ein diffuseres Bild. Selbst intuitiv sehr hoch erscheindende Werte haben hier keinen deutlich negativen Einfluss auf die Performance. Für die weitere Betrachtung wurde der Bereich zur Optimierung deshalb breit gesetzt auf 2-70.
 
+```{r impact of n on performance, echo=FALSE}
+hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_V1.csv")[-1:-3]
+
+plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
+  hyperparameter_tuning_results_legacy_v1$undersamplingFactor < 0.1) * 
+    (hyperparameter_tuning_results_legacy_v1$kSMOTE < 100) * 
+    (hyperparameter_tuning_results_legacy_v1$nRatioSMOTE > 0.3) * 
+    (hyperparameter_tuning_results_legacy_v1$kFold==4)
+))[,c(3,5)])
+
+```
+UNDERSAMPLING
+
+
+
+
+Für die Durchführung der Hyperparameteroptimierung wurde eine neue Funktion erstellt. Diese ruft einen Großteil der bereits diskutierten Funktionen auf. Diese Funktion probiert eine zufällige Hyperparameterkombination aus und gibt die Ergebnisse zurück. 
 
 ```{r Hyperparameteroptimierung}
 # Input: zu nutzende Algorithmen, kFold (für crossvalidation), der Datensatz, der auszuprobierende Wertebereich
@@ -1032,16 +1227,18 @@ Aufgrund der langen Laufzeiten, die viele hundert Durchläufe mit sich bringen, 
 
 ```{r Skript}
 
-testedHyperparameters <- read.csv("hyperparameter_tuning_V2.csv")[,-1]
+testedHyperparameters <- read.csv("~/DAC/hyperparameter_tuning_V2.csv")[,-1]
 colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
 
-number_of_runs <- 50
-
-for (i in 1:number_of_runs){
+for (i in 1:500){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
     oversampling_algorithm = sample(c("smote", "asn"),1),
     classifier = sample(c("xgboost", "logistic_regression"),1), 
     entireDataset = ccdata,
+    #kForFold = 10,
+    #kForSMOTE = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70),
+    #nDesiredRatioSMOTERange = 1.0,
+    #undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)
     kForFold = 4,
     kForSMOTE = c(2,4,6,8,10,12,16,20,25,30,35,40,50,60,70),
     nDesiredRatioSMOTERange = 1.0,
@@ -1051,18 +1248,136 @@ for (i in 1:number_of_runs){
   testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
   cat("---------------------------- Abgeschlossener Durchlauf: ", i, " ----------------------------")
   
-  write.csv(testedHyperparameters, "hyperparameter_tuning_V2.csv", row.names=TRUE)
+  write.csv(testedHyperparameters, "~/DAC/hyperparameter_tuning_V2.csv", row.names=TRUE)
 }
+
 
 ```
 
 
 
 ### 4.5 Ergebnisse der Performance
-```{r Performance des ASN-SMOTE}
-#Code
+
+Zunächst soll betrachtet werden, wie welche Hyperparameter-Kombinationen mit den verschiedenen Algorithmen performt haben.
+
+```{r Plotten der Ergebnisse der Hyperparameteroptimierung, echo=FALSE}
+
+testedHyperparameters <- read.csv("~/DAC/hyperparameter_tuning_V2.csv")[,-1]
+colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
+
+
+
+## Undersampling x kSMOTE plotten - SMOTE XGBOOST
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE > 0.7) * 
+    (testedHyperparameters$kSMOTE < 200) * 
+    (testedHyperparameters$kFold==4) *
+    (testedHyperparameters$undersamplingFactor >= 0) *
+    (testedHyperparameters$oversampling_altorithm == "smote") *	
+    (testedHyperparameters$classifier == "xgboost")										   
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = kSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "k (SMOTE)", y = "Undersampling-Faktor", color = "AUC", title="SMOTE + XGBOOST") +
+  theme_minimal()
+
+## Undersampling x kSMOTE plotten - ASN XGBOOST
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE > 0.7) * 
+    (testedHyperparameters$kSMOTE < 200) * 
+    (testedHyperparameters$kFold==4) *
+    (testedHyperparameters$undersamplingFactor >= 0) *
+    (testedHyperparameters$oversampling_altorithm == "asn") *	
+    (testedHyperparameters$classifier == "xgboost")										   
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = kSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "k (ASN)", y = "Undersampling-Faktor", color = "AUC", title = "ASN + XGBOOST") +
+  theme_minimal()
+
+
+## Undersampling x kSMOTE plotten - SMOTE LogReg
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE > 0.7) * 
+    (testedHyperparameters$kSMOTE < 200) * 
+    (testedHyperparameters$kFold==4) *
+    (testedHyperparameters$undersamplingFactor >= 0) *
+    (testedHyperparameters$oversampling_altorithm == "smote") *	
+    (testedHyperparameters$classifier == "logistic_regression")										   
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = kSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "k (SMOTE)", y = "Undersampling-Faktor", color = "AUC", title = "SMOTE + Logistische Regression") +
+  theme_minimal()
+
+## Undersampling x kSMOTE plotten - ASN LogReg
+
+
+dataToPlot <- subset(testedHyperparameters, as.logical((
+  testedHyperparameters$nRatioSMOTE > 0.7) * 
+    (testedHyperparameters$kSMOTE < 200) * 
+    (testedHyperparameters$kFold==4) *
+    (testedHyperparameters$undersamplingFactor >= 0) *
+    (testedHyperparameters$oversampling_altorithm == "asn") *	
+    (testedHyperparameters$classifier == "logistic_regression")										   
+))
+
+# Convert nRATIO column from character to numeric
+dataToPlot$nRatioSMOTE <- as.numeric(gsub(",", ".", dataToPlot$nRatioSMOTE))
+
+# Create a scatter plot 
+ggplot(dataToPlot, aes(x = kSMOTE, y = undersamplingFactor, color = AUCAverage)) +
+  geom_point(size = 5) +
+  scale_color_gradient(low = "red", high = "blue") +
+  labs(x = "k (ASN)", y = "Undersampling-Faktor", color = "AUC", title = "ASN + Logistische Regression") +
+  theme_minimal()
+
 ```
 
+Bei Auswertung der Ergebnisse der Hyperparameteroptimierung ist deutlich zu erkennen, dass ein hoher Wert für das Undersampling (99%) sich besonders positiv auf die Modelperformance auswirkt. Damit wird das Dataset gleich deutlich balancierter und bereits vor Anwendung eines Oversampling Algorithmus ändert sich das Verhältnis zwischen min. und maj. Class so von ~578:1 auf 5,77:1. 
+
+```{r plot performance comparision, echo=FALSE, warning=FALSE}
+
+testedHyperparameters <- read.csv("~/DAC/hyperparameter_tuning_V2.csv")[,-1]
+colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
+
+tested_hyperparameters_result_table <- aggregate(testedHyperparameters$AUCAverage, list(testedHyperparameters$oversampling_altorithm, testedHyperparameters$classifier), function(x) c(mean = mean(x), max = max(x)))
+tested_hyperparameters_result_table[,4] <- round((tested_hyperparameters_result_table[,3])[,2],3)
+tested_hyperparameters_result_table[,3] <- round((tested_hyperparameters_result_table[,3])[,1],3)
+
+colnames(tested_hyperparameters_result_table) <- c("oversampling_altorithm", "classifier", "AUC mean", "AUC max")
+
+
+knitr::kable(tested_hyperparameters_result_table[order(-tested_hyperparameters_result_table[3]), ])
+
+
+```
+
+Sowohl im Durchschnitt aller getesteten Hyperparameter-Kombinationen als auch bei der jeweils besten Hyperparameter-Kombination schnitt ASN-SMOTE deutlich schlechter ab als das normale SMOTE. Außerdem lässt sich erkennen, dass bei den Classifiern die logistische Regression im Durchschnitt aller getesteten Hyperparameter-Kombinationen besser abschneidet. Die Ergebnisse liegen aber sehr nah beieinander. Beim jeweils besten Durchlauf liegen die Ergebnisse noch näher beienander.
 
 
 ## 5. Ausblick
@@ -1076,7 +1391,7 @@ for (i in 1:number_of_runs){
 
 
 Aufgabengebiete Philipp von Lovenberg:
-Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Erstellung der Cross-Validation, Hyperparametertuning von SMOTE-Algorithmus, Durchführen des Undersamplings, Mitarbeit bei der Erstellung des R Markdown Dokuments.
+Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Erstellung der Cross-Validation, Hyperparametertuning von SMOTE-Algorithmus, Skript, Plotten, Performanceauswertung, Durchführen des Undersamplings, Mitarbeit bei der Erstellung des R Markdown Dokuments.
 
 Aufgabengebiete Vincent Bläske:
 Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Implementierung des SMOTE-Algorithmus, Durcharbeiten des ASN-SMOTE Papers, Mitarbeit bei der R Implementierung des ASN-SMOTE, Auswahl und Implementierung der Classifier, Hyperparametertuning der Classifier, Plotten, Performanceauswertung, Mitarbeit bei der Erstellung des R Markdown Dokuments.
