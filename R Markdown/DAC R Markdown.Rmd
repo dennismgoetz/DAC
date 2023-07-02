@@ -46,7 +46,11 @@ Derzeit stellen unausgeglichene Datensätze eine erhebliche Herausforderung im B
 
 
 ## 2. Data Exploration
-Der zu behandelnde Datensatz Creditdata beinhaltet europäische Kreditkartentransaktionen von September 2013 im CSV-Format und besitzt pro Transaktion 31 Features/Spalten, wobei die letzte binäre Spalte die Target darstellt. Diese definiert, ob ein Sample Fraud (1) oder kein Fraud (0) ist. Das Ziel hierbei ist es ein Machine Learning Modell zu trainieren, welcher Kreditkartenbetrug erkennen soll, um die Kunden vor unautorisierten Belastungen zu schützen. Die Daten sind ausschließlich numerisch und abgesehen von Time und Amount aus Datenschutzgründen mit PCA transformiert worden. Zu Beginn werden die notwendigen Packages geladen sowie die Working Directory in den Ordner gesetzt, worin sich der Creditdata Datensatz befindet und mit read.csv eingelesen. Anschließend wird eine NA-Analyse durchgeführt und einige Statistiken der einzelnen Spalten berechnet. Die Imbalance des Datensatzes wird deutlich, wenn wir die Anzahl der Minority Samples mit den 284.315 der Majority vergleichen. Denn es befinden sich lediglich 492 Fraud Samples in Creditdata, was einem Prozentsatz von 0,17% entspricht. Dies deutet auf eine extreme Imbalance zwischen Majority und Minority hin und macht eine Preprocessingmethode umso notwendiger. Aufgrund der hohen Imbalance wird ein 90 zu 10 Split der Daten in Trainings- und Testdatensatz durchgeführt, worauf eine Trennung der Features von der Target Variable folgt. Da das Feature Time als nicht aussagekräftig genug erscheint, wird dieses aus dem Datensatz entfernt und ebenfalls ein Scaling der Spalte Amount vorgenommen, da diese nicht mit PCA transformiert wurde. Dies geschieht in Trainings- und Testdatensatz separat, um den Mittelwert und die Standardabweichung des Testdatensatzes nicht mit in den Trainingsdatensatz aufzunehmen, was andernfalls zu Overfitting führen würde. Beim Korrelationsplot der Features mit der Target Variable fallen einige positive als auch negative Korrelation beim Feature Amount beispielsweise mit V2 und V7 auf. Die Target Value weist z.B. mit den Features V12, V15 und V17 lediglich einige niedrige negative Korrelation auf. Dies liegt insbesondere an der PCA Transformation, welche in Voraus durchgeführt wurde. Aus diesem Grund werden keine Features selektiert.
+Der zu behandelnde Datensatz Creditdata beinhaltet europäische Kreditkartentransaktionen von September 2013 im CSV-Format und besitzt pro Transaktion 31 Features/Spalten, wobei die letzte binäre Spalte die Target darstellt. Diese definiert, ob ein Sample Fraud (1) oder kein Fraud (0) ist. Das Ziel hierbei ist es ein Machine Learning Modell zu trainieren, welcher Kreditkartenbetrug erkennen soll, um die Kunden vor unautorisierten Belastungen zu schützen. Die Daten sind ausschließlich numerisch und abgesehen von Time und Amount aus Datenschutzgründen mit PCA transformiert worden. Zu Beginn werden die notwendigen Packages geladen sowie die Working Directory in den Ordner gesetzt, worin sich der Creditdata Datensatz befindet und mit read.csv eingelesen. Anschließend wird eine NA-Analyse durchgeführt und einige Statistiken der einzelnen Spalten berechnet. Die Imbalance des Datensatzes wird deutlich, wenn wir die Anzahl der Minority Samples mit den 284.315 der Majority vergleichen. Denn es befinden sich lediglich 492 Fraud Samples in Creditdata, was einem Prozentsatz von 0,17% entspricht. Dies deutet auf eine extreme Imbalance zwischen Majority und Minority hin und macht eine Preprocessingmethode umso notwendiger.  
+
+Aufgrund der hohen Imbalance wird ein 90 zu 10 Split der Daten in Trainings- und Testdatensatz durchgeführt, worauf eine Trennung der Features von der Target Variable folgt. Da das Feature Time als nicht aussagekräftig genug erscheint, wird dieses aus dem Datensatz entfernt und ebenfalls ein Scaling der Spalte Amount vorgenommen, da diese nicht mit PCA transformiert wurde. Dies geschieht in Trainings- und Testdatensatz separat, um den Mittelwert und die Standardabweichung des Testdatensatzes nicht mit in den Trainingsdatensatz aufzunehmen, was andernfalls zu Overfitting führen würde. Beim Korrelationsplot der Features mit der Target Variable fallen einige positive als auch negative Korrelation beim Feature Amount beispielsweise mit V2 und V7 auf. Die Target Value weist z.B. mit den Features V12, V15 und V17 lediglich einige niedrige negative Korrelation auf. Dies liegt insbesondere an der PCA Transformation, welche in Voraus durchgeführt wurde. Aus diesem Grund werden keine Features selektiert.  
+
+Die hier einmalig erzeugten subsets train und test mit werden in Kapitel 2 genutzt. In Kapitel 3 wird dafür ein komplexeres Vorgehen mit mehreren Durchläufen genutzt.
 
 ```{r Load packages, message=FALSE, warning=FALSE}
 
@@ -444,21 +448,22 @@ performance <- function(title, pred) {
 ```
 
 
-## Performance Logistic Regression mit SMOTE
+*Performance Logistic Regression mit SMOTE:*
 ```{r}
 performance("Logistische Regression mit SMOTE", pred_log_reg_smote)
 ```
-## Peformance XGBoost mit SMOTE
+
+*Peformance XGBoost mit SMOTE:*
 ```{r}
 performance("XGBoost mit SMOTE", pred_xgboost_smote)
 ```
 
-## Peformance Logistische Regression mit ASN SMOTE
+*Peformance Logistische Regression mit ASN SMOTE:*
 ```{r}
 performance("Logistische Regression mit ASN SMOTE", pred_log_reg_asn_smote)
 ```
 
-## Peformance XGBoost mit ASN SMOTE
+*Peformance XGBoost mit ASN SMOTE:*
 ```{r}
 performance("XGBoost mit ASN SMOTE", pred_xgboost_asn_smote)
 ```
@@ -484,7 +489,8 @@ ggplot(train_asn_smote, aes(x = V1, y = V2)) +
 
 ```
 
-## Interpretation der Ergebnisse
+*Interpretation der Ergebnisse:*
+
 Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler (False Negative --> als nicht_fraud prognostiziert aber in Wahrheit Fraud) beim ASN Smote lagen (hier nur 2 dimensional), sieht man dass die Fehler in den selben Bereichen liegen. Der Unterschied liegt darin, dass bei der Anwendung des ASN Smotes, etwas mehr False negative entstanden sind (auch an der confusion matrix zu erkennen) 
 
 
@@ -492,7 +498,7 @@ Wenn man sich jetzt genauer anschaut wo die Fehler beim Smote und wo die Fehler 
 ## 4. Programmablauf mit Cross-Validation und Hyperparameteroptimierung
 ### 4.1 Undersampling
 
-Der vorliegende Datensatz ist mit seinem Verhältnis zwischen Majority Class und Minority Class von ca. 578:1 deutlich stärker imbalanced als die Datensätze, mit denen ASN-SMOTE im dazugehörigen Paper getestet wurde (1,82 - 41,4). Deshalb und aufgrund der herausfordernden langen Laufzeiten wurde sich dafür entschieden, die majority class zu undersamplen. Dafür wurde eine Funktion für random undersampling implementiert. 
+Der vorliegende Datensatz ist mit seinem Verhältnis zwischen Majority Class und Minority Class von ca. 578:1 deutlich stärker imbalanced als die Datensätze, mit denen ASN-SMOTE im dazugehörigen Paper getestet wurde (1,82 - 41,4). Deshalb und aufgrund der herausfordernden langen Laufzeiten wurde sich dafür entschieden, die majority class zu undersamplen. Dafür wurde eine Funktion für random undersampling implementiert, welcher nur samples der majority class entfernt.
 
 
 ```{r Undersampling}
@@ -527,6 +533,7 @@ table(undersampled_data$Class)
 cat("\n","undersampling um ", round((1-(table(undersampled_data$Class)[1]/table(ccdata$Class)[1])),4)*100, " % \n")
 
 ```
+
 Dabei wird mit der Sample Funktion gearbeitet, wodurch das tatsächliche Verhältnis minimal abweichen kann. Nach ersten Tests mit dem Undersampling, SMOTE und XGBoost wurde davon ausgegangen, dass selbst starkes Undersampling keinen negativen Einfluss auf die Performance haben würde. 
 
 ```{r impact of undersampling rate on performance, echo=FALSE}
@@ -539,6 +546,9 @@ plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
 ))[,c(2,5)])
 
 ```
+
+
+Bei der Verwendung von ASN-SMOTE mit Undersampling ist zu beachten, dass es einen Unterschied macht, ob zuerst der Undersampling oder der ASN-Algorithmus ausgeführt wird. Das liegt daran, dass beim ASN-SMOTE (anders als bei normalem SMOTE) auch die majority class samples berücksichtigt werden (qualified vs. unqualified minority samples). Im weiteren Vorgehen wurde sich dafür entschieden, ASN-SMOTE so anzuwenden, das hier alle majority class samples berücksichtigt werden sollen und das ASN-SMOTE dementsprechend auf den nicht undersampleten Datensatz angewendet wird. 
 
 
 ### 4.2 Cross-Validation
@@ -586,18 +596,332 @@ mergeSubsetsIntoTrainAndTest <- function(whichSubsetAsTest = 1, subsetList = spl
 # Output: List mit train und test - Datensatz
 ```
 
+Hier wurden nun die bisherigen Code-Bestandteile neu kombiniert, um jede Kombination von Oversampling-Algorithmus und Classifier einfach abrufbar zu machen.  
+Beim ASN-SMOTE ist hier auch zu sehen, dass der ASN-SMOTE auf den nicht-undersampleten trainingsdatensatz angewendet wird (siehe Abschnitt zum Undersampling). Draufhin werden die minority class samples aus dem ASN-Ergebnis und die majority class samples aus dem undersampleten Datensatz zum finalen Trainingsdatensatz zusammengefügt.  
+
+
+```{r Funktionen zum Aufrufen der Algorithmus Kombinationen}
+
+run_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577, train, test){
+  
+  # Perform SMOTE
+  set.seed(1234)
+  smote_ <- smotefamily::SMOTE(X = train[,-31], target = train$Class, K = kSMOTE, dup_size = nSMOTE)
+  training <- smote_$data
+  training <- training[,-31]
+  training$Class <- as.factor(training$Class)
+  print("diag")
+  print(table(training$Class))
+  
+  ## train the random forest algorithm on the training data using the mlr and tidyverse packages
+  
+  # Define the task
+  task <- makeClassifTask(data = training, target = "Class")
+  
+  # Set the learner
+  learner <- makeLearner("classif.xgboost", predict.type = "prob")
+  
+  # Define the parameter set
+  params <- makeParamSet(
+    makeIntegerParam("nrounds", lower = 100, upper = 500),  # 100 500
+    makeNumericParam("eta", lower = 0.05, upper = 0.3)  # 0.05 0.3
+  )
+  
+  # Set the control for tuning
+  ctrl <- makeTuneControlRandom(maxit=1L)
+  
+  # Set resampling strategy
+  rdesc <- makeResampleDesc("CV", iters = 2L)
+  
+  # Tune the hyperparameters
+  tune_result <- tuneParams(learner, task = task, resampling = rdesc, par.set = params, control = ctrl)
+  
+  # Print the results
+  print(tune_result)
+  
+  # Set the tuned parameters
+  learner_tuned <- setHyperPars(learner, par.vals = tune_result$x)
+  
+  # Train the model
+  final_model <- mlr::train(learner_tuned, task)
+  
+  # Make predictions on the test set
+  test$Class <- as.factor(test$Class)
+  
+  # Make predictions on the test set
+  test_pred <- predict(final_model, newdata = test, type = "prob")
+  
+  # Calculate AUC
+  roc_obj <- performance(test_pred, measures = mlr::auc)
+
+  auc <- roc(test$Class, as.numeric(test_pred$data$response))
+  
+  
+  ## Generate confusion matrix
+  # Convert to factor
+  test_pred$data$response <- as.factor(test_pred$data$response)
+  test_pred$data$truth <- as.factor(test_pred$data$truth)
+  
+  cm = confusionMatrix(data = test_pred$data$response, reference = test_pred$data$truth)
+  
+  return(list(
+    "ROC" = roc_obj, 
+    "AUC" = auc$auc, 
+    "ConfusionMatrix" = cm))
+}
+# Output: List mit auc, roc und confusion matrix
+
+
+# Input: Hyperparameter von SMOTE, Train und Testdatensatz
+run_asn_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577,  train_undersampled, train_not_undersampled, test){
+  
+  # Perform SMOTE
+  set.seed(1234)
+  # ASN mit nicht undersampled trainingsdatensatz
+  asn_train <- asn_smote(train_not_undersampled, k = kSMOTE, n = nSMOTE)
+  # print("asn_train")
+  # print(table(asn_train$Class))
+  
+  # print("train_undersampled")
+  # print(table(train_undersampled$Class))
+  
+  # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz
+  training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])
+  # print("training")
+  # print(table(training$Class))
+  
+  training$Class <- as.factor(training$Class)
+  
+  
+  ## train the random forest algorithm on the training data using the mlr and tidyverse packages
+  
+  # Define the task
+  task <- makeClassifTask(data = training, target = "Class")
+  
+  # Set the learner
+  learner <- makeLearner("classif.xgboost", predict.type = "prob")
+  
+  # Define the parameter set
+  params <- makeParamSet(
+    makeIntegerParam("nrounds", lower = 100, upper = 500),  # 100 500
+    makeNumericParam("eta", lower = 0.05, upper = 0.3)  # 0.05 0.3
+  )
+  
+  # Set the control for tuning
+  ctrl <- makeTuneControlRandom(maxit=1L)
+  
+  # Set resampling strategy
+  rdesc <- makeResampleDesc("CV", iters = 2L)
+  
+  # Tune the hyperparameters
+  tune_result <- tuneParams(learner, task = task, resampling = rdesc, par.set = params, control = ctrl, measures= mlr::auc)
+  
+  # Print the results
+  print(tune_result)
+  
+  # Set the tuned parameters
+  learner_tuned <- setHyperPars(learner, par.vals = tune_result$x)
+  
+  # Train the model
+  final_model <- mlr::train(learner_tuned, task)
+  
+  best_nrounds <- tune_result$x$nrounds
+  best_eta <- tune_result$x$eta
+  
+  # Make predictions on the test set
+  test$Class <- as.factor(test$Class)
+  
+  # Make predictions on the test set
+  test_pred <- predict(final_model, newdata = test, type = "prob")
+  
+  # Calculate AUC
+  roc_obj <- performance(test_pred, measures = mlr::auc)
+  
+  auc <- roc(test$Class, as.numeric(test_pred$data$response))
+  
+  
+  ## Generate confusion matrix
+  # Convert to factor
+  test_pred$data$response <- as.factor(test_pred$data$response)
+  test_pred$data$truth <- as.factor(test_pred$data$truth)
+  
+  cm = confusionMatrix(data = test_pred$data$response, reference = test_pred$data$truth)
+  #print(cm)
+  
+  return(list(
+    "ROC" = roc_obj, 
+    "AUC" = auc$auc, 
+    "ConfusionMatrix" = cm))
+}
+# Output: List mit auc, roc und confusion matrix
+
+
+# Input: Hyperparameter von SMOTE, Train und Testdatensatz
+run_smote_with_logistic_regression <- function (kSMOTE = 5, nSMOTE = 577, train, test) {
+  
+  # Perform SMOTE
+  set.seed(1234)
+  smote_ <- smotefamily::SMOTE(X = train[,-31], target = train$Class, K = kSMOTE, dup_size = nSMOTE)
+  training <- smote_$data
+  training <- training[,-31]
+  training$Class <- as.factor(training$Class)
+  print("diag")	
+  print(table(training$Class))
+  
+  ## Train the logistic regression algorithm on the training data using tidymodels
+  
+  # Define the logistic regression model
+  log_reg <- logistic_reg(mode = "classification", engine = "glmnet", penalty = tune(), mixture = tune())
+  
+  # Define the grid search for the hyperparameters
+  grid <- grid_regular(penalty(), mixture(), levels = c(penalty = 3, mixture = 4))
+  
+  # Define the workflow for the model
+  log_reg_wf <- workflow() %>%
+    add_model(log_reg) %>%
+    add_formula(Class ~ .)
+  
+  # Define the resampling method for the grid search
+  folds <- vfold_cv(data = training, v = 5)
+  
+  # Tune the hyperparameters using the grid search
+  
+  
+  log_reg_tuned <- tune_grid(
+    log_reg_wf,
+    resamples = folds,
+    grid = grid,
+    control = control_grid(save_pred = TRUE)
+  )
+  
+  # Select the best model based on the metric
+  best_model <- select_best(log_reg_tuned, metric = "roc_auc")
+  
+  # Extract the best hyperparameters from the tibble object
+  best_penalty <- best_model$penalty
+  best_mixture <- best_model$mixture
+  
+  # Fit the model using the optimal hyperparameters
+  log_reg_final <- logistic_reg(penalty = best_penalty, mixture = best_mixture) %>%
+    set_engine("glmnet") %>%
+    set_mode("classification") %>%
+    fit(Class~., data = training)
+  
+  # Evaluate the model performance on the testing set
+  pred_class <- predict(log_reg_final,
+                        new_data = test,
+                        type = "class")
+  
+  # Calculate AUC
+  auc <- roc(test$Class, as.numeric(pred_class$.pred_class))
+  
+  ## Generate confusion matrix
+  # Convert to factor
+  model_pred <- as.factor(pred_class$.pred_class)
+  model_true <- as.factor(test$Class)
+  
+  cm <- confusionMatrix(data = model_pred, reference =model_true)
+  
+  return(list( 
+    "ROC" = NA,
+    "AUC" = auc$auc,
+    "ConfusionMatrix" = cm))
+}
+# Output: List mit auc, roc und confusion matrix
+
+
+# Input: Hyperparameter von SMOTE, Train und Testdatensatz
+run_asn_smote_with_logistic_regression <- function (kSMOTE = 5, nSMOTE = 577,  train_undersampled, train_not_undersampled, test){	
+  
+  # Perform SMOTE	
+  set.seed(1234)	
+  # ASN mit nicht undersampled trainingsdatensatz	
+  asn_train <- asn_smote(train_not_undersampled, K = kSMOTE, dup_size = nSMOTE)	
+  # print("asn_train")	
+  # print(table(asn_train$Class))	
+  
+  # print("train_undersampled")	
+  # print(table(train_undersampled$Class))	
+  
+  # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz	
+  training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])	
+  # print("training")	
+  # print(table(training$Class))	
+  
+  training$Class <- as.factor(training$Class)
+  
+  
+  ## Train the logistic regression algorithm on the training data using tidymodels
+  
+  # Define the logistic regression model
+  log_reg <- logistic_reg(mode = "classification", engine = "glmnet", penalty = tune(), mixture = tune())
+  
+  # Define the grid search for the hyperparameters
+  grid <- grid_regular(penalty(), mixture(), levels = c(penalty = 3, mixture = 4))
+  
+  # Define the workflow for the model
+  log_reg_wf <- workflow() %>%
+    add_model(log_reg) %>%
+    add_formula(Class ~ .)
+  
+  # Define the resampling method for the grid search
+  folds <- vfold_cv(data = training, v = 5)
+  
+  # Tune the hyperparameters using the grid search
+  
+  
+  log_reg_tuned <- tune_grid(
+    log_reg_wf,
+    resamples = folds,
+    grid = grid,
+    control = control_grid(save_pred = TRUE)
+  )
+  
+  # Select the best model based on the metric
+  best_model <- select_best(log_reg_tuned, metric = "roc_auc")
+  
+  # Extract the best hyperparameters from the tibble object
+  best_penalty <- best_model$penalty
+  best_mixture <- best_model$mixture
+  
+  # Fit the model using the optimal hyperparameters
+  log_reg_final <- logistic_reg(penalty = best_penalty, mixture = best_mixture) %>%
+    set_engine("glmnet") %>%
+    set_mode("classification") %>%
+    fit(Class~., data = training)
+  
+  # Evaluate the model performance on the testing set
+  pred_class <- predict(log_reg_final,
+                        new_data = test,
+                        type = "class")
+  
+  # Calculate AUC
+  auc <- roc(test$Class, as.numeric(pred_class$.pred_class))
+  
+  ## Generate confusion matrix
+  # Convert to factor
+  model_pred <- as.factor(pred_class$.pred_class)
+  model_true <- as.factor(test$Class)
+  
+  cm <- confusionMatrix(data = model_pred, reference =model_true)
+  
+  return(list( 
+    "ROC" = NA,
+    "AUC" = auc$auc,
+    "ConfusionMatrix" = cm))
+}
+# Output: List mit auc, roc und confusion matrix
+
+
+```
+
+
 Die übergeordnete Funktion für die Cross Validation ruft einige zuvor definierte Funktionen auf. Beim Aufrufen der Funktion muss u.a. als Parameter eingegeben werden, welcher Oversampling-Algorithmus und Classifier genutzt werden soll, wie stark die Majority Class undersampled werden soll, in wie viele Teile der Datensatz unterteilt werden soll (entspricht Anzahl der Kombinationen der Cross Validation) und wie das Verhältnis zwischen Minority und Majority Class nach Under- & Oversampling in den Trainingsdatensätzen sein soll. 
 
-Bei der Betrachtung der Implementierung der Funktion "splitIntoKSubsets" fällt auf, dass das Verhältnis zwischen Minority und Majority Klasse nach dem Teilen nicht in jedem Subset gleich sein wird. Außerdem können die Trainigsdatensätze später noch undersampled werden. Darauf ergibt sich eine Herausforderung für das Setzen des Parameters N von SMOTE. Möchten wir nach dem SMOTEN von jedem dieser Trainingsdatensätze in diesem ein Verhältnis von z.B. 1:1 zwischen Majority und Minority Class haben, müssten wir den dafür benötigten N Wert für jedes Subset unter Berücksichtigung des Undersampling Faktors neu bestimmen. Daher wurde hier implementiert, dass für jedes Subset der für ein gewünschtes Zielverhältnis ("nDesiredRatioOfClassesForSMOTE") benötigte N Parameter für SMOTE ("nAbsoluteSMOTE") berechnet wird. 
+Bei der Betrachtung der Implementierung der Funktion "splitIntoKSubsets" fällt auf, dass das Verhältnis zwischen Minority und Majority Klasse nach dem Teilen nicht in jedem Subset exakt gleich sein wird. Außerdem können die Majority Class Samples in den Trainigsdatensätzen noch undersampled werden, wodurch sich ebenfalls das Verhältnis von Minority zu Majority Class in den Trainingsdatensätzen ändert. Darauf ergibt sich eine Herausforderung für das Setzen des Parameters n von SMOTE. Möchten wir nach dem SMOTE/ASN von jedem dieser Trainingsdatensätze in diesem ein Verhältnis von z.B. 1:1 zwischen Majority und Minority Class haben, müssten wir den dafür benötigten n Wert für jedes Subset unter Berücksichtigung des Undersampling Faktors neu bestimmen. Daher wurde hier implementiert, dass für jedes Subset der für ein gewünschtes Zielverhältnis ("nDesiredRatioOfClassesForSMOTE") benötigte n Parameter für SMOTE/ASN ("nAbsoluteSMOTE") berechnet wird. Dabei würde ein Wert von 1.2 (=120%) bedeuten, dass nach SMOTE/ASN 20% mehr (ursprüngliche) minority class samples als majority class samples vorhanden sind. Ein Wert von 1.0 (=100%) führt zu einem Verhältnis von 1:1.
 
 
 ```{r Cross-Validation}
-
-##### K-fold Cross-Validation:
-## Einmal Datensatz splitten
-## schleife von 1:k, jedes mal ein anderes Subset als Testdatensatz wählen
-## in der Schleife: Aktuellen Test und Train-Datensatz in Model geben & AOC speichern
-## Nach durchlauf der Schlaufe: Durchschnitt von AOC bilden & returnen
 
 # Input: gewünschte Algorithmen, Anzahl der gewünschten Subsets für Crossvalidation, Datensatz, Parameter für SMOTE
 kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, entireDataset, undersampling_factor, kForSMOTE, nDesiredRatioOfClassesForSMOTE){
@@ -606,23 +930,10 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
   for (i in 1:length(subsets)){
     inputDataForModelRun <- mergeSubsetsIntoTrainAndTest(whichSubsetAsTest = i, subsetList = subsets)
     
-    # UNDERSAMPLING : 
-    #print(undersampling_factor)
-    #print(table(inputDataForModelRun$train$Class))
     undersampled_train <- undersample(undersampling_factor, inputDataForModelRun$train)
-    #print(table(inputDataForModelRun$train$Class))
     
     
-    
-    # da in jedem subset ein leicht anderes anderes Verhältnis von min zu maj
-    # klasse vorliegt, sollte der N parameter für jedes subset bestimmt werden.
-    # nDesiredRatioOfClassesForSMOTE von 100% (= 1) bedeutet dabei, 
-    # dass nach SMOTE gleich viele minority wie 
-    # majority samples im Datensatz sein sollen (100% bedeutet also gleich viele,
-    # das sollte wieder einen absoluten n Wert von ca. 577 ergeben)
-    # Das Hyperparametertuning erfolgt somit später mit prozentwerten statt
-    # absoluten werten. z.B. 120% (=1.2) würde also bedeuten, wir wollen
-    # 20% mehr minority als majority samples nach SMOTE
+    # Bestimmung n:
     nAbsoluteSMOTE <- table(undersampled_train$Class)[1]/table(undersampled_train$Class)[2]
     nAbsoluteSMOTE <- round((nAbsoluteSMOTE-1)*nDesiredRatioOfClassesForSMOTE)
     
@@ -638,7 +949,6 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
         cat("run_asn_smote_with_xgboost - with N = ",nAbsoluteSMOTE)
         resultsOfSingleRun <- run_asn_smote_with_xgboost(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE,  train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
       }
-      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     }
     else if (classifier == "logistic_regression"){
       if (oversampling_algorithm == "smote"){
@@ -649,9 +959,7 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
         cat("run_asn_smote_with_logistic_regression - with N = ",nAbsoluteSMOTE)
         resultsOfSingleRun <- run_asn_smote_with_logistic_regression(kSMOTE = kForSMOTE, nSMOTE = nAbsoluteSMOTE, train_undersampled = undersampled_train, train_not_undersampled = inputDataForModelRun$train, test = inputDataForModelRun$test)
       }
-      else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     }
-    else {cat("FEHLER - FEHLER - FEHLER - FEHLER - FEHLER")}
     
     
     vectorOfAOCresults <- c(vectorOfAOCresults, resultsOfSingleRun$AUC)
