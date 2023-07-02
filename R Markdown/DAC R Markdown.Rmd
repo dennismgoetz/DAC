@@ -77,7 +77,7 @@ library(readxl)
 ```{r Data Exploration}
 # Load the dataset
 
-ccdata <- read.csv("creditcard.csv")
+ccdata <- read.csv("~/creditcard.csv")
 
 # look at the data
 #View(ccdata)
@@ -271,7 +271,7 @@ asn_smote <- function(train, n, k) {
 
 ```{r Execute ASN-SMOTE function}
 # Execute ASN-SMOTE function (optimal balanced with n=707)
-train_asn_smote <- asn_smote(train, n=707, k=5)
+train_asn_smote <- asn_smote(train, n=2, k=5)
 
 # Execute ASN-SMOTE function with high 'k' (very high k doesn't make sense!)
 asn_smote(train, n=10, k=100)
@@ -292,7 +292,7 @@ ggplot(train_smote, aes(x = V1, y = V2)) +
 ```
 
 ## Unterschiede bei der Generierung der synthetischen Daten
-Im Vergelich zum Plot in dem der SMOTE abgebildet wurde, erkennt man Unterschiede wo der Asn SMOTE andere Ergebnisse liefert. Während der Smote einen größeren Bereich abdeckt, in dem die synthetischen Daten entstehen, “ignoriert” der ASN Smote manche Bereiche (Hier im Bereich … zu erkennen). Zusammenfassend lässt sich jedoch sagen, dass der Smote und Asn Smote sehr ähnlich sind und deswegen der Großteil der synthetischen Daten in den gleichen Bereichen entstehen.
+Im Vergleich zum Plot in dem der SMOTE abgebildet wurde, erkennt man Unterschiede wo der ASN-SMOTE andere Ergebnisse liefert. Während SMOTE einen größeren Bereich abdeckt, in dem die synthetischen Daten entstehen, “ignoriert” der ASN Smote manche Bereiche (Hier im Bereich … zu erkennen). Zusammenfassend lässt sich jedoch sagen, dass der SMOTE und ASN Smote sehr ähnlich sind und deswegen der Großteil der synthetischen Daten in den gleichen Bereichen entstehen.
 
 
 ### 3.3 Verwendete Classifier
@@ -1182,6 +1182,8 @@ kFoldCrossValidate <- function(oversampling_algorithm, classifier, kForFold, ent
 
 ### 4.3 Hyperparameteroptimierung von SMOTE/ASN und Undersampling  
 
+*Vorbereitung und erste Analyse der Hyperparameter*
+
 Nachdem die Hyperparameteroptimierung der Classifier bereits implementiert ist (siehe Classifier Implementierungen), fehlt nun noch ein Optimieren der Hyperparameter von SMOTE/ASN und der undersampling Rate. Dabei wurde ein Random Search implementiert, welcher innerhalb definierter Bereiche Hyperparameterkombinationen testet und die kreuzvalidierte Performance speichert. So mehr Hyperparameter optimiert werden sollen und so größer die Bereiche dafür sind, desto mehr Durchläufe werden benötigt, um zuverlässige Aussagen über optimale Parameter und deren Einfluss auf die Performance treffen zu können.
 
 Dafür wurde in ersten Tests mit SMOTE und XGBoost eingegrenzt, welche Bereiche für die verschiedenen Hyperparameter gesetzt werden. Dabei wurde unterstellt, dass auch das Verwenden von ASN-SMOTE oder logistischer Regression die Bereiche, in denen sinnvoll nach Parametern gesucht werden soll, nicht deutlich ändern im Vergleich zu normalem SMOTE und XGBoost.
@@ -1214,10 +1216,9 @@ plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
 ))[,c(3,5)])
 
 ```
-UNDERSAMPLING
+Für das Undersampling wurden die Ergebnisse der ersten Tests bereits in Kapitel 4.1 dargestellt. Für die weitere Optimierung wurde hier ein Bereich von 0.8 (=80%) bis 0.99 (=99%) gewählt. 
 
-
-
+*Implementierung Hyperparameteroptimierung*
 
 Für die Durchführung der Hyperparameteroptimierung wurde eine neue Funktion erstellt. Diese ruft einen Großteil der bereits diskutierten Funktionen auf. Diese Funktion probiert eine zufällige Hyperparameterkombination aus und gibt die Ergebnisse zurück. 
 
@@ -1270,18 +1271,22 @@ Aufgrund der langen Laufzeiten, die viele hundert Durchläufe mit sich bringen, 
 
 ```{r Skript}
 
+ccdata <- read.csv("~/creditcard.csv")
+
+# Preprocessing
+ccdata <- ccdata[,-1]
+ccdata[,-30] <- scale(ccdata[,-30])
+
 testedHyperparameters <- read.csv("~/DAC/hyperparameter_tuning_V2.csv")[,-1]
 colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
 
-for (i in 1:500){
+number_of_runs <- 2
+
+for (i in 1:number_of_runs){
   newRandomHyperparameterTestResult <- tryRandomHyperparameter(
-    oversampling_algorithm = sample(c("smote", "asn"),1),
-    classifier = sample(c("xgboost", "logistic_regression"),1), 
+    oversampling_algorithm = sample(c("smote", "smote"),1),
+    classifier = sample(c("logistic_regression", "logistic_regression"),1), 
     entireDataset = ccdata,
-    #kForFold = 10,
-    #kForSMOTE = c(2:10,12,14,16,18,20,22,24,30,35,40,45,50,55,60,65,70),
-    #nDesiredRatioSMOTERange = 1.0,
-    #undersamplingFactor = c(0.75, 0.80, 0.85, 0.90, 0.95, 0.99)
     kForFold = 4,
     kForSMOTE = c(2,4,6,8,10,12,16,20,25,30,35,40,50,60,70),
     nDesiredRatioSMOTERange = 1.0,
@@ -1424,19 +1429,17 @@ Sowohl im Durchschnitt aller getesteten Hyperparameter-Kombinationen als auch be
 
 ## 5. Ausblick
 
+Die Diskussion um eine weitere Verbesserung von Oversampling-Algorithmen bleibt spannend. Im Projekt konnte gezeigt werden, dass Weiterentwicklungen von SMOTE, denen eine bessere Performance erstmal zuzutrauen wäre, nicht unbedingt besser performen müssen als das "klassische" SMOTE. Das ist auch deshalb bemerkenswert, weil SMOTE einer vergleichsweise einfachen Logik folgt. Welcher Oversampling-Algorithmus am Ende für einen Datensatz wirklich am besten geeignet ist, ist aber auch immer von der Beschaffenheit dieses Datensatzes abhängig. Hätte der Datensatz eher eine Struktur gehabt wie im ASN-Paper, grafisch gesprochen mit eher separierten Punktwolken anstatt der massiven Überlappung der Punktwolken, hätte ASN-SMOTE möglicherweise auf- oder sogar überholt. Abschließend lässt sich festhalten, dass es in der Praxis meist eine gute Wahl ist, auf etablierte Standard-Algorithmen zu setzen, insbesondere dann, wenn keine Besonderheiten am Datensatz bekannt sind, welche den Einsatz eines dafür passenden spezialisierteren Algorithmus rechtfertigt.
 
 
 
+## Notizen
 
-
-
-
-
-Aufgabengebiete Philipp von Lovenberg:
+*Aufgabengebiete Philipp von Lovenberg:*
 Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Erstellung der Cross-Validation, Hyperparametertuning von SMOTE-Algorithmus, Skript, Plotten, Performanceauswertung, Durchführen des Undersamplings, Mitarbeit bei der Erstellung des R Markdown Dokuments.
 
-Aufgabengebiete Vincent Bläske:
+*Aufgabengebiete Vincent Bläske:*
 Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Implementierung des SMOTE-Algorithmus, Durcharbeiten des ASN-SMOTE Papers, Mitarbeit bei der R Implementierung des ASN-SMOTE, Auswahl und Implementierung der Classifier, Hyperparametertuning der Classifier, Plotten, Performanceauswertung, Mitarbeit bei der Erstellung des R Markdown Dokuments.
 
-Aufgabengebiete Dennis Götz:
+*Aufgabengebiete Dennis Götz:*
 Durcharbeiten SMOTE-Paper, Mitarbeit bei der Erstellung der Präsentationsfolien, Mitarbeit bei der Recherche nach modernen SMOTE Adaptionen, Durcharbeiten des ASN-SMOTE Papers und der dazugehörigen Python Implementierung, Mitarbeit bei der R Implementierung des ASN-SMOTE und des Modells der logistischen Regression, Mitarbeit bei der Erstellung des R Markdown Dokuments.
