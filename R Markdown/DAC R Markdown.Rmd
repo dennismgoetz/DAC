@@ -464,26 +464,26 @@ performance <- function(title, pred) {
 
 
 *Performance Logistic Regression mit SMOTE:*
-```{r}
+```{r Performance Logistic Regression mit SMOTE}
 title1 <- "Logistische Regression mit SMOTE"
 performance(title1, pred_log_reg_smote)
 ```
 
 *Peformance XGBoost mit SMOTE:*
-```{r}
+```{r Peformance XGBoost mit SMOTE}
 title2 <- "XGBoost mit SMOTE"
 
 performance(title2, pred_xgboost_smote)
 ```
 
 *Peformance Logistische Regression mit ASN SMOTE:*
-```{r}
+```{r Peformance Logistische Regression mit ASN SMOTE}
 title3 <- "Logistische Regression mit ASN SMOTE"
 performance(title3, pred_log_reg_asn_smote)
 ```
 
 *Peformance XGBoost mit ASN SMOTE:*
-```{r}
+```{r Peformance XGBoost mit ASN SMOTE}
 title4 <- "XGBoost mit ASN SMOTE"
 performance(title4, pred_xgboost_asn_smote)
 ```
@@ -500,24 +500,28 @@ Zusammenfassend lässt sich sagen, dass beide Fehlerfälle vermieden werden soll
 
 Beim Vergleich der Classifier zeigt sich, dass die logistische Regression in diesem Fall im SMOTE deutlich besser abschneidet als der XGBoost, jedoch im ASN-SMOTE, der XGBoost stärker performt. Auch interessant ist, dass der XGBoost im Vergleich der confusion matrix, bei der Specificity einen stärkeren Wert aufweist als die logitische regression. Später soll nochmal betrachtet werden wie die Classifier über mehrere Iterationen hinweg, im Hinblick auf den AUC abschneiden.
 
-```{r Wo wurden die Fehler gemacht?}
+```{r Analyse der Fehler}
 ggplot(train_smote, aes(x = V1, y = V2)) +
-  geom_point(data = train_smote[train_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
-  geom_point(data = train_smote[train_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
-  geom_point(data = test[pred_log_reg_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
-  ggtitle("FALSE NEGATIVE bei XGBoost mit SMOTE") +
+  geom_point(data = train_smote[train_smote$Class == 0,], alpha = 0.4, aes(color = "Majority Class")) +  
+  geom_point(data = train_smote[train_smote$Class == 1,], alpha = 0.4,  aes(color = "Minority Class")) +
+  geom_point(data = test[pred_log_reg_smote == 0 & test$Class == 1, ], alpha = 1, aes(color = "False Negative minority class from test_set"), size = 3) +
+  ggtitle("FALSE NEGATIVE bei Logistische Regression mit SMOTE") +
   xlim(-4, 3) + 
-  ylim(-4, 4)
+  ylim(-4, 4) +
+  scale_color_manual(values = c("red","#E69F00","#56B4E9"),
+                     labels = c("False Negative minority class from test_set","Majority Class", "Minority Class" )) +
+  guides(color = guide_legend())
 
 ggplot(train_asn_smote, aes(x = V1, y = V2)) +
-  geom_point(data = train_asn_smote[train_asn_smote$Class == 0,], alpha = 0.4, color = "#E69F00") +  
-  geom_point(data = train_asn_smote[train_asn_smote$Class == 1,], alpha = 0.4, color = "#56B4E9") +
-  geom_point(data = test[pred_log_reg_asn_smote == 0 & test$Class == 1, ], alpha = 1, color = "red", size = 3) +
-  ggtitle("FALSE NEGATIVE bei XGBoost mit ASN SMOTE") +
+  geom_point(data = train_asn_smote[train_asn_smote$Class == 0,], aes(color = "Majority Class"),alpha = 0.4) +  #, color = "#E69F00"
+  geom_point(data = train_asn_smote[train_asn_smote$Class == 1,], aes(color = "Minority Class"), alpha = 0.4) + #, color = "#56B4E9"
+  geom_point(data = test[pred_log_reg_asn_smote == 0 & test$Class == 1, ], aes(color = "False Negative minority class from test_set"),alpha = 1,  size = 3) + #color = "red",
+  ggtitle("FALSE NEGATIVE bei Logistische Regression mit ASN SMOTE") +
   xlim(-4, 3) + 
-  ylim(-4, 4) 
-
-
+  ylim(-4, 4) +
+  scale_color_manual(values = c("red","#E69F00","#56B4E9"),
+                     labels = c("False Negative minority class from test_set","Majority Class", "Minority Class" )) +
+  guides(color = guide_legend())
 ```
 
 
