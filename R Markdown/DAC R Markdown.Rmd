@@ -679,16 +679,9 @@ run_asn_smote_with_xgboost <- function (kSMOTE = 5, nSMOTE = 577,  train_undersa
   set.seed(1234)
   # ASN mit nicht undersampled trainingsdatensatz
   asn_train <- asn_smote(train_not_undersampled, k = kSMOTE, n = nSMOTE)
-  # print("asn_train")
-  # print(table(asn_train$Class))
-  
-  # print("train_undersampled")
-  # print(table(train_undersampled$Class))
-  
+
   # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz
   training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])
-  # print("training")
-  # print(table(training$Class))
   
   training$Class <- as.factor(training$Class)
   
@@ -836,17 +829,12 @@ run_asn_smote_with_logistic_regression <- function (kSMOTE = 5, nSMOTE = 577,  t
   # Perform SMOTE	
   set.seed(1234)	
   # ASN mit nicht undersampled trainingsdatensatz	
-  asn_train <- asn_smote(train_not_undersampled, K = kSMOTE, dup_size = nSMOTE)	
-  # print("asn_train")	
-  # print(table(asn_train$Class))	
-  
-  # print("train_undersampled")	
+  asn_train <- asn_smote(train_not_undersampled, k = kSMOTE, n = nSMOTE)
+
   # print(table(train_undersampled$Class))	
   
   # Zusammenfügen von minority class aus ASN Ergebnis und majority class aus undersampling datensatz	
   training <- rbind(train_undersampled[train_undersampled$Class==0,], asn_train[asn_train$Class==1,])	
-  # print("training")	
-  # print(table(training$Class))	
   
   training$Class <- as.factor(training$Class)
   
@@ -982,7 +970,7 @@ zu N: In ersten Tests mit SMOTE und XGBoost kaum Einfluss auf die Performance
 (außer Extremwerte die so niedrig sind das de facto nicht mehr gesmotet wird -> dann nähert sich performance an die Performance ohne SMOTE an). Daher entscheidung nratiosmote nicht zu optimieren, das Verhältnis im Datensatz nach SMOTE/ASN soll also immer 1:1 sein. 
 
 ```{r impact of n on performance, echo=FALSE}
-hyperparameter_tuning_results_legacy_v1 <- read.csv("~/DAC/hyperparameter_tuning_v1.csv")[-1:-3]
+hyperparameter_tuning_results_legacy_v1 <- read.csv("C:/Users/noel2/OneDrive/Studium Workspace/M.Sc. Betriebswirtschaftslehre/BAOR_Data Analytics Challange/DAC Shared Workspace/R Workspace/hyperparameter_tuning_V1.csv")[-1:-3]
 
 plot(subset(hyperparameter_tuning_results_legacy_v1, as.logical((
   hyperparameter_tuning_results_legacy_v1$undersamplingFactor == 0) * 
@@ -1037,6 +1025,37 @@ tryRandomHyperparameter <- function (oversampling_algorithm, classifier, kForFol
 
 
 ### 4.4 Skript
+
+Die beschriebenen Funktionen müssen nun in einem kurzen Skript aufgerufen werden. 
+Aufgrund der langen Laufzeiten, die viele hundert Durchläufe mit sich bringen, sollen die Parameter und Ergebnisse der einzelnen Durchläufe in einer CSV-Datei gespeichert werden. Außerdem ist im Skript eine Schleife zu finden, die bei jedem Durchlauf eine Parameterkombination ausprobiert und das Ergebnis in der CSV speichert. 
+
+
+```{r Skript}
+
+testedHyperparameters <- read.csv("hyperparameter_tuning_V2.csv")[,-1]
+colnames(testedHyperparameters) <- c("oversampling_altorithm", "classifier", "kFold", "undersamplingFactor", "kSMOTE", "nRatioSMOTE", "AUCAverage")
+
+number_of_runs <- 50
+
+for (i in 1:number_of_runs){
+  newRandomHyperparameterTestResult <- tryRandomHyperparameter(
+    oversampling_algorithm = sample(c("smote", "asn"),1),
+    classifier = sample(c("xgboost", "logistic_regression"),1), 
+    entireDataset = ccdata,
+    kForFold = 4,
+    kForSMOTE = c(2,4,6,8,10,12,16,20,25,30,35,40,50,60,70),
+    nDesiredRatioSMOTERange = 1.0,
+    undersamplingFactor = c(0.80, 0.85, 0.90, 0.95, 0.99)
+  )
+  
+  testedHyperparameters <- rbind(testedHyperparameters, newRandomHyperparameterTestResult)
+  cat("---------------------------- Abgeschlossener Durchlauf: ", i, " ----------------------------")
+  
+  write.csv(testedHyperparameters, "hyperparameter_tuning_V2.csv", row.names=TRUE)
+}
+
+```
+
 
 
 ### 4.5 Ergebnisse der Performance
