@@ -1,7 +1,7 @@
 # Data Analytics Challenge
 ## Synthetic Minority-Oversampling-Technique (SMOTE)
 
-This project was part of the "Data Analytics Challenge" course at Catholic University of Eichstätt-Ingolstadt. 
+This project was part of the "Data Analytics Challenge" course at the Catholic University of Eichstätt-Ingolstadt. 
 The objective was to tackle the challenge of imbalanced datasets using the Synthetic Minority Oversampling 
 Technique (SMOTE) and a recent adaption of the SMOTE algorithm (ASN-SMOTE: a synthetic minority oversampling 
 method with adaptive qualified synthesizer selection).
