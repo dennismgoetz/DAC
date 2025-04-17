@@ -6,7 +6,7 @@ The objective was to tackle the challenge of imbalanced datasets using the Synth
 Technique (SMOTE) and a recent adaption of the SMOTE algorithm (ASN-SMOTE: a synthetic minority oversampling 
 method with adaptive qualified synthesizer selection).
 
-## Project description
+## Problem description
 Unbalanced data sets are a significant challenge in the field of machine learning and data mining. This is because conventional 
 classification methods generally tend to favor the majority class, which often has many times more instances than the minority 
 class in a binary classification problem. This greatly impairs the classifier's predictive ability to correctly recognize the 
